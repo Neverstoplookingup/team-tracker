@@ -10,41 +10,67 @@
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8fafc; }
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-body: #f8fafc;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--bg-body); 
+            color: #1e293b;
+            overflow: hidden;
+        }
+        
+        /* 优雅的自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .drag-over { background-color: rgba(99, 102, 241, 0.05) !important; outline: 2px dashed #818cf8; outline-offset: -2px; }
-        .whitespace-pre-wrap { white-space: pre-wrap; word-wrap: break-word; }
         
+        /* 拖拽视觉反馈 */
+        .drag-over { 
+            background-color: #eef2ff !important; 
+            border: 2px dashed #818cf8 !important; 
+        }
+        .dragging { opacity: 0.4; transform: scale(0.98); }
+        
+        /* 动画效果 */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
         
-        .modal-overlay { animation: fadeIn 0.2s ease-out; }
-        .modal-content { animation: slideUp 0.3s ease-out; }
+        .modal-overlay { animation: fadeIn 0.2s ease-out forwards; }
+        .modal-content { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .live-dot { border-radius: 50%; animation: pulse-green 2s infinite; }
         
-        /* 手风琴平滑过渡 */
-        .swimlane-content { transition: max-height 0.4s ease-in-out, opacity 0.4s ease-in-out; overflow: hidden; }
-        .swimlane-open { max-height: 3000px; opacity: 1; }
+        /* 平滑过渡 */
+        .smooth-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .swimlane-content { transition: max-height 0.5s ease-in-out, opacity 0.4s ease-in-out; overflow: hidden; }
+        .swimlane-open { max-height: 4000px; opacity: 1; }
         .swimlane-closed { max-height: 0; opacity: 0; }
         
-        .accordion-content { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; overflow: hidden; }
-        .accordion-open { max-height: 2000px; opacity: 1; }
-        .accordion-closed { max-height: 0; opacity: 0; }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
+    <!-- Firebase SDK Modules -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // 您的专属 Firebase 配置
-        const firebaseConfig = {
+        // 兼容环境注入配置或使用你的专属配置
+        const userConfig = {
           apiKey: "AIzaSyDyfETIW3f_mqphx7w2eErR_Z4w-EUWsZg",
           authDomain: "kanban-a8614.firebaseapp.com",
           projectId: "kanban-a8614",
@@ -53,157 +79,167 @@
           appId: "1:42784160848:web:12d40daec006adad1ea555",
           measurementId: "G-J9014LF5NG"
         };
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userConfig;
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const storage = getStorage(app);
         
-        window.FB = { auth, db, storage, doc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, signInAnonymously, onAuthStateChanged, ref, uploadBytesResumable, getDownloadURL };
+        window.FB = { 
+            auth, db, storage, doc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, 
+            signInAnonymously, signInWithCustomToken, onAuthStateChanged, 
+            ref, uploadBytesResumable, getDownloadURL 
+        };
         window.dispatchEvent(new Event('firebase-loaded'));
     </script>
 
+    <!-- React App Logic -->
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // 空数据初始化
-        const initialData = [];
-
-        // ------------------------------------------
-        // 工具与配置 (轻量级色彩设计)
-        // ------------------------------------------
-        const COLUMN_CONFIG = {
-            'Need Attention': { title: 'Need Attention', borderTop: 'border-t-4 border-red-400', headerBg: 'bg-red-50/50', text: 'text-red-600', icon: '🚨' },
-            'To Do': { title: '待处理 (To Do)', borderTop: 'border-t-4 border-slate-300', headerBg: 'bg-slate-50', text: 'text-slate-600', icon: '📝' },
-            'In progress': { title: '进行中 (In progress)', borderTop: 'border-t-4 border-indigo-400', headerBg: 'bg-indigo-50/50', text: 'text-indigo-600', icon: '🚀' },
-            'Pending': { title: '等待/暂停 (Pending)', borderTop: 'border-t-4 border-amber-400', headerBg: 'bg-amber-50/50', text: 'text-amber-600', icon: '⏸️' },
-            'Done': { title: '已完成 (Done)', borderTop: 'border-t-4 border-emerald-400', headerBg: 'bg-emerald-50/50', text: 'text-emerald-600', icon: '✅' }
+        // 图标组件库
+        const Icons = {
+            Alert: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+            File: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+            Play: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Pause: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Link: () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
+            Edit: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+            Search: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+            Download: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+            Upload: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
         };
 
+        const COLUMN_CONFIG = {
+            'Need Attention': { title: 'Need Attention', borderColor: 'border-red-400', headerBg: 'bg-red-50', text: 'text-red-600', icon: <Icons.Alert /> },
+            'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File /> },
+            'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play /> },
+            'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause /> },
+            'Done': { title: '已完成', borderColor: 'border-emerald-400', headerBg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Icons.Check /> }
+        };
+
+        // 辅助函数
         const generateId = () => 'task-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-        
         const getInitials = (name) => {
             if (!name || name.trim() === '') return '?';
             const first = name.split(/[,&、]/)[0].trim();
             return /^[a-zA-Z]/.test(first) ? first.substring(0, 2).toUpperCase() : first.substring(0, 1);
         };
-        
         const stringToColor = (str) => {
             let hash = 0;
             for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            return `hsl(${hash % 360}, 70%, 80%)`;
+            return `hsl(${hash % 360}, 65%, 75%)`;
         };
-        
-        // 格式化时间：MM.DD.YYYY. HH:mm
         const formatDateTime = (timestamp) => {
-            if (!timestamp) return '';
+            if (!timestamp) return '-';
             const d = new Date(timestamp);
-            const pad = (n) => n.toString().padStart(2, '0');
-            const MM = pad(d.getMonth() + 1);
-            const DD = pad(d.getDate());
-            const YYYY = d.getFullYear();
-            const HH = pad(d.getHours());
-            const mm = pad(d.getMinutes());
-            return `${MM}.${DD}.${YYYY}. ${HH}:${mm}`;
+            return `${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getDate().toString().padStart(2, '0')}.${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
         };
 
-        const Avatar = ({ name }) => {
-            const names = name ? name.split(/[,&、]/).map(n => n.trim()).filter(n => n) : [];
-            if (names.length === 0) return <div className="text-[10px] text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded bg-slate-50">未分配</div>;
+        // UI 组件: 头像堆叠
+        const AvatarGroup = ({ name }) => {
+            const names = name ? name.split(/[,&、]/).map(n => n.trim()).filter(Boolean) : [];
+            if (names.length === 0) return <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">未分配</span>;
             return (
-                <div className="flex -space-x-1.5 overflow-hidden items-center">
-                    {names.slice(0, 3).map((n, i) => (
-                        <div key={i} className="inline-block w-5 h-5 rounded-full ring-1 ring-white flex items-center justify-center text-[8px] font-bold text-slate-700 shadow-sm" style={{ backgroundColor: stringToColor(n) }} title={n}>
-                            {getInitials(n)}
-                        </div>
-                    ))}
-                    {names.length > 3 && <div className="inline-block w-5 h-5 rounded-full ring-1 ring-white bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-600 shadow-sm">+{names.length - 3}</div>}
-                    {names.length === 1 && <span className="text-[10px] text-slate-500 ml-2 max-w-[50px] truncate">{names[0]}</span>}
+                <div className="flex items-center">
+                    <div className="flex -space-x-1.5">
+                        {names.slice(0, 3).map((n, i) => (
+                            <div key={i} className="w-5 h-5 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-slate-700 shadow-sm" style={{ backgroundColor: stringToColor(n) }} title={n}>
+                                {getInitials(n)}
+                            </div>
+                        ))}
+                        {names.length > 3 && <div className="w-5 h-5 rounded-full ring-2 ring-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shadow-sm">+{names.length - 3}</div>}
+                    </div>
+                    {names.length === 1 && <span className="text-[10px] text-slate-500 ml-1.5 truncate max-w-[60px] font-medium">{names[0]}</span>}
                 </div>
             );
         };
 
+        // UI 组件: 任务卡片
         const TaskCard = ({ task, onEdit, onDragStart, onDragEnd, hideCategoryLabel = false }) => {
-            const getFileIcon = (url) => {
-                if(!url) return '🔗';
-                const lowerUrl = url.toLowerCase();
-                if(lowerUrl.includes('.pdf')) return '📄';
-                if(lowerUrl.includes('.doc') || lowerUrl.includes('.docx')) return '📝';
-                if(lowerUrl.includes('.xls') || lowerUrl.includes('.xlsx') || lowerUrl.includes('.csv')) return '📊';
-                if(lowerUrl.includes('.ppt') || lowerUrl.includes('.pptx')) return '📽️';
-                if(lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg') || lowerUrl.includes('.png')) return '🖼️';
-                return '🔗';
+            const handleDragStart = (e) => {
+                e.dataTransfer.setData('taskId', task.id);
+                setTimeout(() => e.target.classList.add('dragging'), 0);
+                if (onDragStart) onDragStart(e);
+            };
+            const handleDragEnd = (e) => {
+                e.target.classList.remove('dragging');
+                if (onDragEnd) onDragEnd(e);
             };
 
             return (
                 <div 
                     draggable="true" 
-                    onDragStart={(e) => { e.dataTransfer.setData('taskId', task.id); e.currentTarget.style.opacity = '0.5'; if(onDragStart) onDragStart(e); }} 
-                    onDragEnd={(e) => { e.currentTarget.style.opacity = '1'; if(onDragEnd) onDragEnd(e); }} 
+                    onDragStart={handleDragStart} 
+                    onDragEnd={handleDragEnd} 
                     onClick={() => onEdit(task)}
-                    className="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group relative overflow-hidden flex flex-col"
+                    className="bg-white p-3.5 rounded-xl border border-slate-200 cursor-grab active:cursor-grabbing hover:border-indigo-300 hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px]"
                 >
-                    <div className="absolute top-1.5 right-2 text-[9px] text-slate-400 font-medium bg-slate-50 px-1 py-0.5 rounded">
-                        {formatDateTime(task.updatedAt)}
-                    </div>
-
-                    <div className="flex justify-between items-start mb-1.5 pr-24">
-                        {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold rounded uppercase tracking-wider line-clamp-1">{task.category || '未分类'}</span>}
-                        {task.no && hideCategoryLabel && <span className="text-[10px] text-slate-400 font-mono">#{task.no}</span>}
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex flex-wrap gap-1.5 pr-8">
+                            {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">{task.category || '未分类'}</span>}
+                            {task.no && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 text-[10px] font-mono rounded-md">#{task.no}</span>}
+                        </div>
                     </div>
                     
-                    <h4 className="font-semibold text-slate-800 text-sm mb-2 leading-snug group-hover:text-indigo-600 transition-colors">{task.task || '未命名事项'}</h4>
+                    <h4 className="font-semibold text-slate-800 text-[13px] mb-2 leading-relaxed group-hover:text-indigo-600 transition-colors">
+                        {task.task || '未命名事项'}
+                    </h4>
+                    
+                    {task.detail && (
+                        <div className="mb-2">
+                            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/80 p-1.5 rounded-md border border-slate-100">{task.detail}</p>
+                        </div>
+                    )}
                     
                     {task.progress && (
-                        <div className="bg-slate-50 p-2 rounded text-xs text-slate-600 mb-2.5 border border-slate-100 flex-1">
-                            <div className="line-clamp-3 whitespace-pre-wrap">{task.progress}</div>
+                        <div className="mb-3 flex-1">
+                            <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed whitespace-pre-wrap">{task.progress}</p>
                         </div>
                     )}
 
                     {task.attachmentUrl && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }}
-                            className="w-full text-left mb-2.5 px-2 py-1.5 bg-indigo-50/50 hover:bg-indigo-100 border border-indigo-100 rounded text-[11px] text-indigo-600 flex items-center space-x-1.5 transition-colors shadow-sm"
-                            title="点击下载 / 查看附件"
-                        >
-                            <span>{getFileIcon(task.attachmentName || task.attachmentUrl)}</span>
-                            <span className="truncate flex-1 font-medium">{task.attachmentName || '查看附件 / 链接'}</span>
-                        </button>
+                        <div className="mt-auto mb-3">
+                            <button onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }} className="max-w-full flex items-center space-x-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-md text-[11px] text-slate-600 hover:text-indigo-600 transition-colors shadow-sm w-fit" title={task.attachmentName || '查看附件'}>
+                                <Icons.Link />
+                                <span className="truncate max-w-[140px] font-medium">{task.attachmentName || '附件链接'}</span>
+                            </button>
+                        </div>
                     )}
                     
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-1 mt-auto">
-                        <Avatar name={task.assignee} />
-                        <span className="text-[10px] text-indigo-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-indigo-50 px-1.5 py-0.5 rounded">✎ 编辑</span>
+                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100/80">
+                        <AvatarGroup name={task.assignee} />
+                        <div className="flex items-center space-x-2">
+                            <span className="text-[9px] text-slate-400 font-medium">{formatDateTime(task.updatedAt).split(' ')[0]}</span>
+                            <span className="opacity-0 group-hover:opacity-100 smooth-transition text-indigo-500 bg-indigo-50 p-1 rounded"><Icons.Edit /></span>
+                        </div>
                     </div>
                 </div>
             );
         };
 
-        // ------------------------------------------
-        // 可折叠的泳道组件 (Swimlane Group)
-        // ------------------------------------------
+        // UI 组件: 可折叠泳道
         const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
             const [isOpen, setIsOpen] = useState(true);
 
             return (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all">
-                    {/* 泳道标题栏 (点击折叠) */}
-                    <button 
-                        onClick={() => setIsOpen(!isOpen)}
-                        className="bg-slate-800 hover:bg-slate-700 transition-colors px-5 py-2.5 flex justify-between items-center w-full focus:outline-none"
-                    >
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col mb-5 smooth-transition">
+                    <button onClick={() => setIsOpen(!isOpen)} className="bg-slate-50 hover:bg-slate-100 transition-colors px-4 py-3 flex justify-between items-center w-full border-b border-slate-200">
                         <div className="flex items-center space-x-3">
-                            <svg className={`w-4 h-4 text-slate-300 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                            <h2 className="font-bold text-white text-sm tracking-wide">
-                                板块：{catName}
+                            <svg className={`w-4 h-4 text-slate-400 smooth-transition ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                            <h2 className="font-bold text-slate-700 text-[13px] tracking-wide flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                                {catName}
                             </h2>
-                            <span className="text-[10px] text-slate-300 bg-slate-600/50 px-2 py-0.5 rounded-full font-mono">{catTasks.length} 项</span>
+                            <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{catTasks.length} 项</span>
                         </div>
                     </button>
                     
-                    {/* 泳道内部横向列 */}
-                    <div className={`swimlane-content bg-slate-50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}`}>
-                        <div className="flex overflow-x-auto p-4 space-x-4 min-h-[160px]">
+                    <div className={`swimlane-content bg-slate-50/50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}`}>
+                        <div className="flex overflow-x-auto p-4 space-x-4 min-h-[200px]">
                             {columns.map(status => {
                                 const config = COLUMN_CONFIG[status];
                                 const colTasks = catTasks.filter(t => t.status === status);
@@ -216,17 +252,18 @@
                                         onDragOver={(e) => onDragOver(e, dropKey)} 
                                         onDragLeave={onDragLeave} 
                                         onDrop={(e) => onDrop(e, status, catName)} 
-                                        className={`flex-shrink-0 w-[280px] flex flex-col rounded-lg bg-white shadow-sm transition-all duration-200 overflow-hidden ${config.borderTop} ${isDragOver ? 'drag-over' : 'border border-slate-200'}`}
+                                        className={`flex-shrink-0 w-[290px] flex flex-col rounded-xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
                                     >
-                                        <div className={`px-3 py-2 flex justify-between items-center border-b border-slate-100 ${config.headerBg}`}>
-                                            <h3 className={`font-bold text-[12px] flex items-center space-x-1.5 ${config.text}`}>
-                                                <span>{config.icon}</span><span>{config.title.split(' ')[0]}</span>
+                                        <div className={`px-3 py-2.5 flex justify-between items-center border-b border-slate-100/50 ${config.headerBg}`}>
+                                            <h3 className={`font-semibold text-xs flex items-center space-x-1.5 ${config.text}`}>
+                                                {config.icon}
+                                                <span>{config.title}</span>
                                             </h3>
-                                            <span className={`text-[10px] font-bold ${config.text} opacity-60 bg-white/60 px-1.5 rounded`}>{colTasks.length}</span>
+                                            <span className={`text-[10px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
                                         </div>
-                                        <div className="p-2 flex-1 space-y-2 overflow-y-auto max-h-[500px] no-scrollbar bg-slate-50/30">
+                                        <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto max-h-[500px] no-scrollbar">
                                             {colTasks.length === 0 ? (
-                                                <div className="h-full min-h-[60px] rounded flex items-center justify-center text-slate-300 text-[11px] opacity-0 hover:opacity-100 transition-opacity">拖拽至此</div>
+                                                <div className="h-full min-h-[80px] rounded-lg border-2 border-dashed border-slate-100 flex items-center justify-center text-slate-300 text-xs">拖拽至此</div>
                                             ) : (
                                                 colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} hideCategoryLabel={true} />)
                                             )}
@@ -240,30 +277,7 @@
             );
         };
 
-        // ------------------------------------------
-        // 可折叠分类列表组件 (用于经典看板中的 To Do 列)
-        // ------------------------------------------
-        const CategoryAccordionGroup = ({ category, tasks, onEdit, onDragStart, onDragEnd }) => {
-            const [isOpen, setIsOpen] = useState(true);
-            return (
-                <div className="mb-3 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                    <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors text-left border-b border-slate-100">
-                        <div className="flex items-center space-x-2">
-                            <span className="text-[11px] font-bold text-slate-700">{category || '未分类'}</span>
-                            <span className="text-[9px] bg-slate-200 px-1.5 py-0.5 rounded-full text-slate-600 font-mono">{tasks.length}</span>
-                        </div>
-                        <svg className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </button>
-                    <div className={`accordion-content bg-slate-50/50 ${isOpen ? 'accordion-open' : 'accordion-closed'}`}>
-                        <div className="p-2 space-y-2">
-                            {tasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} onDragStart={onDragStart} onDragEnd={onDragEnd} hideCategoryLabel={true} />)}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-
+        // 主应用组件
         const App = () => {
             const [tasks, setTasks] = useState([]);
             const [user, setUser] = useState(null);
@@ -271,10 +285,8 @@
             const [saving, setSaving] = useState(false);
             const [uploadingObj, setUploadingObj] = useState({ isUploading: false, progress: 0 });
 
-            const [view, setView] = useState('swimlane'); 
-            const [searchTerm, setSearchTerm] = useState('');
-            const [filterCategory, setFilterCategory] = useState('All');
-            const [filterAssignee, setFilterAssignee] = useState('All');
+            // 统一筛选状态
+            const [filters, setFilters] = useState({ view: 'swimlane', search: '', category: 'All', assignee: 'All' });
             const [draggedOverCol, setDraggedOverCol] = useState(null);
             
             const [editingTask, setEditingTask] = useState(null);
@@ -284,44 +296,61 @@
 
             const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
 
-            // ------------------------------------------
-            // 1. 初始化鉴权
-            // ------------------------------------------
+            // 1. 鉴权初始化 (严格遵循 Rule 3)
             useEffect(() => {
-                const initApp = () => {
+                const initAuth = async () => {
                     if (window.FB && window.FB.auth) {
-                        window.FB.signInAnonymously(window.FB.auth).catch(e => console.error("匿名登录失败:", e));
-                        const unsub = window.FB.onAuthStateChanged(window.FB.auth, setUser);
-                        return () => unsub();
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token);
+                            } else {
+                                await window.FB.signInAnonymously(window.FB.auth);
+                            }
+                        } catch (e) {
+                            console.error("Auth failed:", e);
+                        }
                     }
                 };
-                if (window.FB) initApp();
-                else window.addEventListener('firebase-loaded', initApp);
-                return () => window.removeEventListener('firebase-loaded', initApp);
+
+                const setupListener = () => {
+                    if(window.FB && window.FB.auth) {
+                        initAuth();
+                        return window.FB.onAuthStateChanged(window.FB.auth, setUser);
+                    }
+                }
+
+                let unsub = window.FB ? setupListener() : null;
+                if (!window.FB) {
+                    window.addEventListener('firebase-loaded', () => { unsub = setupListener(); });
+                }
+                return () => { if(unsub) unsub(); window.removeEventListener('firebase-loaded', setupListener); };
             }, []);
 
-            // ------------------------------------------
-            // 2. 实时数据库监听
-            // ------------------------------------------
+            // 2. 数据库监听 (严格遵循 Rule 1)
             useEffect(() => {
                 if (!user || !window.FB) return;
-                const colRef = window.FB.collection(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks');
-                const unsub = window.FB.onSnapshot(colRef, (snapshot) => {
-                    const fetchedTasks = [];
-                    snapshot.forEach(doc => fetchedTasks.push({ id: doc.id, ...doc.data() }));
-                    setTasks(fetchedTasks);
-                    setLoading(false);
-                }, (err) => {
-                    console.error("同步异常:", err);
-                    alert("连接数据库失败，请检查 Firestore Rules！");
-                    setLoading(false);
-                });
+                
+                // 兼容逻辑：优先使用 Canvas 环境的 appId，如果没有则使用原本的 github-deploy 以防数据丢失
+                const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
+                const colRef = window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks');
+                
+                const unsub = window.FB.onSnapshot(colRef, 
+                    (snapshot) => {
+                        const fetchedTasks = [];
+                        snapshot.forEach(doc => fetchedTasks.push({ id: doc.id, ...doc.data() }));
+                        setTasks(fetchedTasks);
+                        setLoading(false);
+                    }, 
+                    (err) => {
+                        console.error("Firestore sync error:", err);
+                        showToast("连接数据库失败，请检查配置或权限！");
+                        setLoading(false);
+                    }
+                );
                 return () => unsub();
             }, [user]);
 
-            // ------------------------------------------
-            // 3. 文件上传逻辑
-            // ------------------------------------------
+            // 文件上传
             const handleFileUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -330,32 +359,28 @@
                 setUploadingObj({ isUploading: true, progress: 0 });
                 const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
                 const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
-                
                 const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
 
                 uploadTask.on('state_changed', 
-                    (snapshot) => {
-                        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-                        setUploadingObj({ isUploading: true, progress });
-                    }, 
-                    (error) => {
-                        alert('文件上传失败，请检查网络或 Storage Rules 配置');
-                        setUploadingObj({ isUploading: false, progress: 0 });
-                    }, 
+                    (snapshot) => setUploadingObj({ isUploading: true, progress: Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) }), 
+                    (error) => { alert('上传失败'); setUploadingObj({ isUploading: false, progress: 0 }); }, 
                     async () => {
                         try {
                             const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
                             setEditingTask(prev => ({ ...prev, attachmentUrl: downloadURL, attachmentName: file.name }));
-                            showToast('附件已成功上传并生成链接！');
-                        } catch(err) { console.error(err); }
+                            showToast('附件上传成功！');
+                        } catch(err) {} 
                         finally { setUploadingObj({ isUploading: false, progress: 0 }); }
                     }
                 );
             };
 
-            // ------------------------------------------
-            // 4. 数据操作
-            // ------------------------------------------
+            // 数据操作
+            const getDocRef = (taskId) => {
+                const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
+                return window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId);
+            };
+
             const handleSaveTask = async (e) => {
                 e.preventDefault();
                 setSaving(true);
@@ -376,21 +401,19 @@
                 };
 
                 try {
-                    const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', taskId);
-                    await window.FB.setDoc(docRef, taskData);
+                    await window.FB.setDoc(getDocRef(taskId), taskData);
                     showToast(editingTask.id ? '已同步更新' : '已发布任务');
                     setEditingTask(null);
-                } catch (error) { alert("保存失败！"); } 
+                } catch (error) { showToast("保存失败！"); } 
                 finally { setSaving(false); }
             };
 
             const handleDeleteTask = async () => {
                 if(!editingTask.id) return;
-                if(confirm('彻底删除此记录？所有人均不可见。')) {
+                if(confirm('确定彻底删除此记录吗？')) {
                     setSaving(true);
                     try {
-                        const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', editingTask.id);
-                        await window.FB.deleteDoc(docRef);
+                        await window.FB.deleteDoc(getDocRef(editingTask.id));
                         showToast('已删除'); setEditingTask(null);
                     } catch (error) {} 
                     finally { setSaving(false); }
@@ -403,39 +426,76 @@
                 const taskId = e.dataTransfer.getData('taskId');
                 if (!taskId) return;
 
+                // 乐观更新 UI
                 setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, category: newCategory || t.category, updatedAt: Date.now() } : t));
+                
                 if (user && window.FB) {
                     try {
-                        const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', taskId);
-                        await window.FB.updateDoc(docRef, { status: newStatus, ...(newCategory && { category: newCategory }), updatedAt: Date.now() });
-                    } catch (error) { showToast("状态同步失败"); }
+                        await window.FB.updateDoc(getDocRef(taskId), { status: newStatus, ...(newCategory && { category: newCategory }), updatedAt: Date.now() });
+                    } catch (error) { showToast("状态同步失败，将刷新页面重试"); }
                 }
+            };
+
+            const handleCsvUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setImportText(event.target.result);
+                    showToast("文件读取成功，请检查内容并点击「解析并导入」");
+                };
+                reader.readAsText(file);
             };
 
             const handleImportSubmit = async () => {
                 if (!importText.trim()) return;
-                let matrix = [];
-                if (importText.indexOf('\t') !== -1) {
-                    matrix = importText.split('\n').map(row => row.split('\t').map(c => { let cell = c.trim(); if (cell.startsWith('"') && cell.endsWith('"')) return cell.substring(1, cell.length - 1); return cell; }));
-                } else {
-                    let row = [], field = '', inQuotes = false;
-                    for (let i = 0; i < importText.length; i++) {
-                        let char = importText[i];
-                        if (char === '"') { if (inQuotes && importText[i+1] === '"') { field += '"'; i++; } else { inQuotes = !inQuotes; } } 
-                        else if (char === ',' && !inQuotes) { row.push(field); field = ''; } 
-                        else if ((char === '\n' || (char === '\r' && importText[i+1] === '\n')) && !inQuotes) { if (char === '\r') i++; row.push(field); matrix.push(row); row = []; field = ''; } 
-                        else { field += char; }
+                
+                // 标准 CSV 解析器（完美支持逗号、制表符分隔，以及处理多行文本中的引号与换行）
+                const parseCSV = (text) => {
+                    const rows = [];
+                    let row = [];
+                    let cell = '';
+                    let inQuotes = false;
+                    
+                    for (let i = 0; i < text.length; i++) {
+                        const char = text[i];
+                        const nextChar = text[i + 1];
+                        
+                        if (char === '"') {
+                            if (inQuotes && nextChar === '"') {
+                                cell += '"'; i++; // 跳过转义的引号
+                            } else {
+                                inQuotes = !inQuotes;
+                            }
+                        } else if ((char === ',' || char === '\t') && !inQuotes) {
+                            row.push(cell.trim()); cell = '';
+                        } else if ((char === '\n' || char === '\r') && !inQuotes) {
+                            if (char === '\r' && nextChar === '\n') i++; // 处理 \r\n
+                            row.push(cell.trim());
+                            if (row.some(c => c !== '')) rows.push(row);
+                            row = []; cell = '';
+                        } else {
+                            cell += char;
+                        }
                     }
-                    if (field || row.length > 0) { row.push(field); matrix.push(row); }
-                }
+                    if (cell || row.length > 0) {
+                        row.push(cell.trim());
+                        if (row.some(c => c !== '')) rows.push(row);
+                    }
+                    return rows;
+                };
 
-                if (!matrix || matrix.length < 2) { alert("无有效数据"); return; }
-                const headers = matrix[0].map(h => h.trim().replace(/^"|"$/g, ''));
+                const matrix = parseCSV(importText);
+
+                if (matrix.length < 2) { alert("未检测到有效数据，请确保包含表头和数据行。"); return; }
+                const headers = matrix[0];
+                
+                // 动态列头映射，精准匹配上传文件中的表头名称
                 const colMap = {
                     category: Math.max(0, headers.findIndex(h => h.includes('分类') || h.includes('板块'))),
                     no: Math.max(1, headers.findIndex(h => h.includes('序号'))),
                     task: Math.max(2, headers.findIndex(h => h.includes('事项') || h.includes('项目'))),
-                    detail: Math.max(3, headers.findIndex(h => h.includes('操作') || h.includes('详细') || h.includes('备注'))),
+                    detail: Math.max(3, headers.findIndex(h => h.includes('具体') || h.includes('详细') || h.includes('备注') || h.includes('操作'))),
                     progress: Math.max(4, headers.findIndex(h => h.includes('进展') || h.includes('预期'))),
                     status: Math.max(5, headers.findIndex(h => h.includes('状态'))),
                     assignee: Math.max(6, headers.findIndex(h => h.includes('参与人') || h.includes('负责人'))),
@@ -444,193 +504,170 @@
                 let parsedData = [], lastCat = "", lastNo = "", lastTask = "";
                 for (let i = 1; i < matrix.length; i++) {
                     const row = matrix[i];
-                    if (!row || row.length === 0 || row.every(c => !c || c.trim() === '')) continue;
+                    if (row.length === 0 || row.every(c => !c)) continue;
                     
-                    const getCell = (idx) => (idx === -1 || idx >= row.length) ? "" : (row[idx] || "").trim().replace(/^"|"$/g, '');
-
+                    const getCell = (idx) => (idx === -1 || idx >= row.length) ? "" : (row[idx] || "");
+                    
+                    // 继承逻辑：处理 Excel 中合并单元格导致的下发空值问题
                     let cat = getCell(colMap.category); if (cat) lastCat = cat; else cat = lastCat;
                     let no = getCell(colMap.no); if (no) lastNo = no; else no = lastNo;
                     let task = getCell(colMap.task); if (task) lastTask = task; else task = lastTask;
-                    let detail = getCell(colMap.detail), progress = getCell(colMap.progress);
-                    let statusRaw = getCell(colMap.status) || "To Do", assignee = getCell(colMap.assignee);
                     
-                    if (!detail && !progress && !assignee && (!statusRaw || statusRaw === "To Do")) continue;
+                    let detail = getCell(colMap.detail);
+                    let progress = getCell(colMap.progress);
+                    let statusRaw = getCell(colMap.status) || "To Do";
+                    let assignee = getCell(colMap.assignee);
+                    
+                    if (!task && !detail && !progress) continue; // 忽略完全空的数据行
 
                     let status = "To Do";
                     const sLower = statusRaw.toLowerCase();
-                    if (sLower.includes("attention") || sLower.includes("老板") || sLower.includes("关注")) status = "Need Attention";
-                    else if (sLower.includes("progress") || sLower.includes("进行")) status = "In progress";
-                    else if (sLower.includes("done") || sLower.includes("完成")) status = "Done";
+                    if (sLower.includes("attention") || sLower.includes("关注") || sLower.includes("重点")) status = "Need Attention";
+                    else if (sLower.includes("progress") || sLower.includes("进行") || sLower.includes("中")) status = "In progress";
+                    else if (sLower.includes("done") || sLower.includes("完成") || sLower.includes("已")) status = "Done";
                     else if (sLower.includes("pending") || sLower.includes("暂缓") || sLower.includes("等待")) status = "Pending";
-                    else if (statusRaw.trim()) status = statusRaw; 
+                    else if (statusRaw.trim() && COLUMN_CONFIG[statusRaw]) status = statusRaw; 
                     
-                    parsedData.push({ id: `task-imp-${Date.now()}-${i}`, category: cat || "默认板块", no, task: task || "未命名事项", detail, progress, status, assignee: assignee || "未分配", attachmentUrl: '', attachmentName: '', updatedAt: Date.now() });
+                    parsedData.push({ 
+                        id: `task-imp-${Date.now()}-${i}`, 
+                        category: cat || "默认板块", 
+                        no: no, 
+                        task: task || "未命名事项", 
+                        detail: detail, 
+                        progress: progress, 
+                        status: status, 
+                        assignee: assignee || "未分配", 
+                        attachmentUrl: '', attachmentName: '', updatedAt: Date.now() 
+                    });
                 }
 
-                if (parsedData.length === 0) { alert("未能解析出有效数据！"); return; }
-                
                 setSaving(true);
                 try {
-                    for (const t of parsedData) {
-                        const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', t.id);
-                        await window.FB.setDoc(docRef, t);
-                    }
+                    // Promise.all 并发写入提升速度
+                    await Promise.all(parsedData.map(t => window.FB.setDoc(getDocRef(t.id), t)));
                     showToast(`成功导入 ${parsedData.length} 条数据！`);
                     setIsImportModalOpen(false); setImportText('');
-                } catch (error) { alert("批量同步失败"); }
+                } catch (error) { alert("批量同步失败，请检查网络"); console.error(error); }
                 finally { setSaving(false); }
             };
 
             const handleExport = () => {
-                const headers = ['分类/板块', '序号', '重点事项', '具体说明', '进展情况', '状态', '参与人', '附件链接', '最后更新时间'];
+                const headers = ['板块', '序号', '重点事项', '内部说明', '进展', '状态', '参与人', '更新时间'];
                 const rows = tasks.map(t => [
-                    `"${(t.category||'').replace(/"/g, '""')}"`, `"${(t.no||'').replace(/"/g, '""')}"`,
-                    `"${(t.task||'').replace(/"/g, '""')}"`, `"${(t.detail||'').replace(/"/g, '""')}"`,
-                    `"${(t.progress||'').replace(/"/g, '""')}"`, `"${(t.status||'').replace(/"/g, '""')}"`, 
-                    `"${(t.assignee||'').replace(/"/g, '""')}"`, `"${(t.attachmentUrl||'').replace(/"/g, '""')}"`,
-                    `"${formatDateTime(t.updatedAt)}"`
+                    `"${t.category||''}"`, `"${t.no||''}"`, `"${(t.task||'').replace(/"/g, '""')}"`, 
+                    `"${(t.detail||'').replace(/"/g, '""')}"`, `"${(t.progress||'').replace(/"/g, '""')}"`, 
+                    `"${t.status||''}"`, `"${t.assignee||''}"`, `"${formatDateTime(t.updatedAt)}"`
                 ]);
                 const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
                 const link = document.createElement("a");
-                link.setAttribute("href", encodeURI(csvContent));
-                link.setAttribute("download", `项目进展看板_${new Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(link); link.click(); link.remove();
-                showToast('数据已导出至本地备份');
+                link.href = encodeURI(csvContent);
+                link.download = `看板导出_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
             };
 
-            // ------------------------------------------
-            // 5. 数据过滤与分组
-            // ------------------------------------------
+            // 过滤与计算
             const filteredTasks = useMemo(() => {
-                const sortedTasks = [...tasks].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-                return sortedTasks.filter(t => {
-                    const matchSearch = `${t.task} ${t.detail} ${t.progress} ${t.assignee}`.toLowerCase().includes(searchTerm.toLowerCase());
-                    const matchCategory = filterCategory === 'All' || t.category === filterCategory;
-                    const matchAssignee = filterAssignee === 'All' || (t.assignee && t.assignee.includes(filterAssignee));
-                    return matchSearch && matchCategory && matchAssignee;
-                });
-            }, [tasks, searchTerm, filterCategory, filterAssignee]);
+                return [...tasks]
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .filter(t => {
+                        const matchSearch = `${t.task} ${t.detail} ${t.progress} ${t.assignee}`.toLowerCase().includes(filters.search.toLowerCase());
+                        const matchCat = filters.category === 'All' || t.category === filters.category;
+                        const matchAssignee = filters.assignee === 'All' || (t.assignee && t.assignee.includes(filters.assignee));
+                        return matchSearch && matchCat && matchAssignee;
+                    });
+            }, [tasks, filters]);
 
-            const dataCategories = useMemo(() => [...new Set(tasks.map(t => t.category).filter(Boolean).sort())], [tasks]);
-            const categories = ['All', ...dataCategories];
-            
-            const assignees = useMemo(() => {
-                const set = new Set();
-                tasks.forEach(t => { if(t.assignee) t.assignee.split(/[,&、]/).forEach(a => { const n = a.trim(); if(n) set.add(n); }) });
-                return ['All', ...Array.from(set)];
-            }, [tasks]);
-            
-            const columns = ['Need Attention', 'To Do', 'In progress', 'Pending', 'Done'];
+            const categories = ['All', ...new Set(tasks.map(t => t.category).filter(Boolean).sort())];
+            const assignees = ['All', ...new Set(tasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))];
+            const columns = Object.keys(COLUMN_CONFIG);
 
-            // ------------------------------------------
-            // 渲染视图
-            // ------------------------------------------
             if (loading) {
                 return (
                     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                        <h2 className="text-slate-500 font-medium text-sm">加载工作台...</h2>
+                        <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                        <h2 className="text-slate-500 font-medium text-sm">正在加载工作台...</h2>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen flex flex-col h-screen overflow-hidden bg-slate-50">
+                <div className="flex flex-col h-screen overflow-hidden">
                     {/* 顶部导航 */}
-                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0 z-10 relative">
+                    <header className="glass-header border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shrink-0 z-20">
                         <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center font-bold text-white">HC</div>
+                            <div className="w-9 h-9 bg-indigo-600 rounded-lg shadow-sm flex items-center justify-center font-bold text-white tracking-wider">HC</div>
                             <div>
-                                <h1 className="text-base font-bold text-slate-800 leading-tight flex items-center">
-                                    团队工作台
-                                    <span className="ml-3 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-green-700 bg-green-50 border border-green-200 tracking-wide">
-                                        <span className="w-1.5 h-1.5 rounded-full mr-1 bg-green-500 live-dot"></span>实时同步
+                                <h1 className="text-[15px] font-bold text-slate-800 flex items-center">
+                                    协同工作台
+                                    <span className="ml-3 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">
+                                        <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-emerald-500 live-dot"></span>实时联机
                                     </span>
                                 </h1>
                             </div>
                         </div>
                         
                         <div className="flex items-center space-x-3">
-                            <div className="flex bg-slate-100 rounded-md p-1 border border-slate-200">
-                                <button onClick={() => setView('swimlane')} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${view === 'swimlane' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>板块泳道</button>
-                                <button onClick={() => setView('kanban')} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${view === 'kanban' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>经典看板</button>
-                                <button onClick={() => setView('table')} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${view === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>表格</button>
+                            <div className="flex bg-slate-100/80 rounded-lg p-1 border border-slate-200/60 shadow-inner">
+                                {['swimlane', 'kanban', 'table'].map(v => (
+                                    <button key={v} onClick={() => setFilters(f => ({...f, view: v}))} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filters.view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                                        {v === 'swimlane' ? '泳道' : v === 'kanban' ? '看板' : '列表'}
+                                    </button>
+                                ))}
                             </div>
-
-                            <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-slate-600 border border-slate-300 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-slate-50 transition-colors" title="批量导入">
-                                导入
+                            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center space-x-1 bg-white text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors shadow-sm">
+                                <Icons.Upload /> <span>导入</span>
                             </button>
-
-                            <button onClick={() => setEditingTask({ status: 'To Do' })} className="bg-indigo-600 text-white px-4 py-1.5 rounded-md text-xs font-medium hover:bg-indigo-700 transition-colors">
-                                + 新建
+                            <button onClick={() => setEditingTask({ status: 'To Do' })} className="flex items-center space-x-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
+                                <span className="text-lg leading-none mb-0.5">+</span> <span>新建任务</span>
                             </button>
                         </div>
                     </header>
 
-                    {/* 工具栏 */}
-                    <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between shrink-0">
-                        <div className="flex items-center space-x-4 overflow-x-auto no-scrollbar py-1">
-                            <div className="flex items-center space-x-2 border-r border-slate-100 pr-4">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">执行人</span>
-                                <select 
-                                    className="text-xs bg-slate-50 border border-slate-200 rounded py-1 px-2 focus:ring-indigo-500 text-slate-600 cursor-pointer min-w-[90px]"
-                                    value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}
-                                >
-                                    {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部' : a}</option>)}
+                    {/* 控制栏 */}
+                    <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-2 flex items-center justify-between shrink-0 z-10">
+                        <div className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-1">
+                            <div className="flex items-center space-x-2 border-r border-slate-200 pr-5">
+                                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">执行人</span>
+                                <select className="text-xs bg-slate-50 border border-slate-200 rounded-md py-1 px-2 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
+                                    {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部人员' : a}</option>)}
                                 </select>
                             </div>
-                            
-                            <div className="flex items-center space-x-2">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">板块过滤</span>
+                            <div className="flex items-center space-x-1.5">
+                                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mr-1">分类</span>
                                 {categories.map(cat => (
-                                    <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-2.5 py-1 rounded text-[11px] font-medium whitespace-nowrap transition-colors border ${filterCategory === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                                    <button key={cat} onClick={() => setFilters(f => ({...f, category: cat}))} className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors border ${filters.category === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
                                         {cat === 'All' ? '全部' : cat}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3 pl-4 border-l border-slate-200">
                             <div className="relative">
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400 text-xs">🔍</span>
-                                <input type="text" placeholder="搜索..." className="pl-7 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-40" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400"><Icons.Search /></span>
+                                <input type="text" placeholder="搜索事项或人员..." className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48 transition-all focus:w-56 focus:bg-white" value={filters.search} onChange={(e) => setFilters(f => ({...f, search: e.target.value}))} />
                             </div>
-                            <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-1 rounded" title="导出数据"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></button>
+                            <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-md hover:bg-slate-100 transition-colors" title="导出备份"><Icons.Download /></button>
                         </div>
                     </div>
 
                     {/* 主内容区 */}
                     <main className="flex-1 overflow-hidden p-6 relative">
                         {tasks.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
-                                <div className="text-4xl mb-3 opacity-50">📭</div>
-                                <h3 className="text-base font-medium text-slate-600 mb-1">空空如也</h3>
-                                <p className="text-xs mb-4">暂无数据，请新建或导入。</p>
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
+                                <div className="text-4xl mb-4 opacity-50">✨</div>
+                                <h3 className="text-base font-medium text-slate-700 mb-1">开始你的第一个项目</h3>
+                                <p className="text-xs mb-4">点击右上角新建任务，或导入已有的 Excel 数据。</p>
                             </div>
-                        ) : view === 'swimlane' ? (
-                            /* 全新轻量级折叠泳道视图 */
-                            <div className="h-full overflow-y-auto pr-2 pb-10 space-y-5">
-                                {(filterCategory === 'All' ? dataCategories : [filterCategory]).map(catName => {
+                        ) : filters.view === 'swimlane' ? (
+                            <div className="h-full overflow-y-auto pr-2 pb-10">
+                                {(filters.category === 'All' ? categories.slice(1) : [filters.category]).map(catName => {
                                     const catTasks = filteredTasks.filter(t => t.category === catName);
                                     if (catTasks.length === 0) return null;
-
-                                    return (
-                                        <CollapsibleSwimlane 
-                                            key={catName} 
-                                            catName={catName} 
-                                            columns={columns} 
-                                            catTasks={catTasks} 
-                                            draggedOverCol={draggedOverCol}
-                                            onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }}
-                                            onDragLeave={() => setDraggedOverCol(null)}
-                                            onDrop={handleDrop}
-                                            onEdit={setEditingTask}
-                                        />
-                                    );
+                                    return <CollapsibleSwimlane key={catName} catName={catName} columns={columns} catTasks={catTasks} draggedOverCol={draggedOverCol} onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={handleDrop} onEdit={setEditingTask} />
                                 })}
                             </div>
-                        ) : view === 'kanban' ? (
-                            /* 经典轻量看板视图 */
+                        ) : filters.view === 'kanban' ? (
                             <div className="flex h-full space-x-5 overflow-x-auto no-scrollbar pb-4 items-start">
                                 {columns.map(status => {
                                     const config = COLUMN_CONFIG[status];
@@ -638,66 +675,53 @@
                                     const isDragOver = draggedOverCol === status;
 
                                     return (
-                                        <div 
-                                            key={status} onDragOver={(e) => { e.preventDefault(); setDraggedOverCol(status); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={(e) => handleDrop(e, status)}
-                                            className={`flex-shrink-0 w-[300px] max-h-full flex flex-col rounded-xl bg-white shadow-sm transition-all duration-200 overflow-hidden ${config.borderTop} ${isDragOver ? 'drag-over' : 'border-x border-b border-slate-200'}`}
-                                        >
-                                            <div className={`px-4 py-2.5 flex justify-between items-center border-b border-slate-100 ${config.headerBg}`}>
-                                                <h3 className={`font-bold text-[13px] flex items-center space-x-1.5 ${config.text}`}><span>{config.icon}</span><span>{config.title}</span></h3>
-                                                <span className={`text-[10px] font-bold ${config.text} opacity-70 bg-white/70 px-2 py-0.5 rounded`}>{colTasks.length}</span>
+                                        <div key={status} onDragOver={(e) => { e.preventDefault(); setDraggedOverCol(status); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={(e) => handleDrop(e, status)} className={`flex-shrink-0 w-[300px] max-h-full flex flex-col rounded-2xl bg-white shadow-sm transition-all duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}>
+                                            <div className={`px-4 py-3 flex justify-between items-center border-b border-slate-100/60 rounded-t-xl ${config.headerBg}`}>
+                                                <h3 className={`font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}`}>{config.icon}<span>{config.title}</span></h3>
+                                                <span className={`text-[10px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
                                             </div>
-                                            <div className="p-3 flex-1 overflow-y-auto no-scrollbar space-y-3 bg-slate-50/30">
-                                                {colTasks.length === 0 ? (
-                                                    <div className="h-20 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-xs">拖拽至此</div>
-                                                ) : (
-                                                    status === 'To Do' ? (
-                                                        categories.slice(1).map(catName => {
-                                                            const catTasks = colTasks.filter(t => t.category === catName);
-                                                            if (catTasks.length === 0) return null;
-                                                            return <CategoryAccordionGroup key={catName} category={catName} tasks={catTasks} onEdit={setEditingTask} />
-                                                        })
-                                                    ) : (
-                                                        colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={setEditingTask} />)
-                                                    )
-                                                )}
+                                            <div className="p-3 flex-1 overflow-y-auto no-scrollbar space-y-3 bg-slate-50/40 rounded-b-xl">
+                                                {colTasks.length === 0 ? <div className="h-24 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-300 text-xs">拖拽至此</div> : colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={setEditingTask} />)}
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         ) : (
-                            /* 表格视图 */
                             <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                                 <div className="overflow-auto flex-1 relative">
-                                    <table className="min-w-full divide-y divide-slate-200">
+                                    <table className="min-w-full divide-y divide-slate-200 text-left">
                                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-32">板块</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-1/4">重点事项</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider">进展/预期</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-28">状态</th>
-                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-28">参与人</th>
-                                                <th className="px-4 py-3 text-right text-[11px] font-medium text-slate-400 uppercase tracking-wider w-32">最后更新</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">板块分类</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-28">状态</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">参与人</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32 text-right">更新时间</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
                                             {filteredTasks.map(task => {
                                                 const config = COLUMN_CONFIG[task.status];
                                                 return (
-                                                    <tr key={task.id} onClick={() => setEditingTask(task)} className="hover:bg-slate-50 transition-colors cursor-pointer group">
-                                                        <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500"><span className="bg-slate-100 px-1.5 py-0.5 rounded">{task.category}</span></td>
-                                                        <td className="px-4 py-3 text-xs text-slate-800 font-medium">
-                                                            {task.task} {task.no && <span className="ml-1 text-[9px] text-slate-400">#{task.no}</span>}
-                                                            {task.attachmentUrl && <span className="ml-1 text-[9px] text-blue-500 bg-blue-50 px-1 rounded" title="包含附件">📎</span>}
+                                                    <tr key={task.id} onClick={() => setEditingTask(task)} className="hover:bg-slate-50/80 transition-colors cursor-pointer group">
+                                                        <td className="px-5 py-3 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
+                                                        <td className="px-5 py-3 text-xs text-slate-800 font-medium">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span>{task.task}</span>
+                                                                {task.no && <span className="text-[10px] text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded">#{task.no}</span>}
+                                                            </div>
+                                                            {task.detail && <div className="text-[10px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
                                                         </td>
-                                                        <td className="px-4 py-3 text-xs text-slate-500"><div className="line-clamp-1 whitespace-pre-wrap">{task.progress || '-'}</div></td>
-                                                        <td className="px-4 py-3 whitespace-nowrap">
-                                                            <span className={`px-2 py-0.5 inline-flex text-[10px] leading-5 font-medium rounded border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                        <td className="px-5 py-3 text-xs text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
+                                                        <td className="px-5 py-3 whitespace-nowrap">
+                                                            <span className={`px-2.5 py-1 inline-flex text-[10px] font-semibold rounded-md border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                                                 {config?.title.split(' ')[0] || task.status}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 whitespace-nowrap"><Avatar name={task.assignee} /></td>
-                                                        <td className="px-4 py-3 whitespace-nowrap text-right text-[10px] text-slate-400">{formatDateTime(task.updatedAt)}</td>
+                                                        <td className="px-5 py-3 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
+                                                        <td className="px-5 py-3 whitespace-nowrap text-right text-[10px] text-slate-400 font-mono">{formatDateTime(task.updatedAt)}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -708,53 +732,53 @@
                         )}
                     </main>
 
-                    {/* 编辑/新增 弹窗 */}
+                    {/* 编辑/新建 任务弹窗 */}
                     {editingTask && (
-                        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content">
-                                <div className="px-6 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                    <h2 className="text-base font-bold text-slate-700 flex items-center">
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
+                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content border border-slate-200/50">
+                                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                                    <h2 className="text-lg font-bold text-slate-800 flex items-center">
                                         {editingTask.id ? '编辑任务' : '新建任务'}
-                                        {saving && <span className="ml-3 text-[10px] text-indigo-500 font-normal">正在同步...</span>}
+                                        {saving && <span className="ml-3 text-xs text-indigo-500 font-normal flex items-center"><span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping mr-2"></span>同步中...</span>}
                                     </h2>
-                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-600" disabled={saving || uploadingObj.isUploading}>✕</button>
+                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving || uploadingObj.isUploading}><Icons.Alert style={{display:'none'}}/><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 
-                                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1">板块分类</label><input name="category" defaultValue={editingTask.category} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="例如：顶层设计" disabled={saving} /></div>
-                                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1">序号标识 (可选)</label><input name="no" defaultValue={editingTask.no} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" disabled={saving} /></div>
+                                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-5">
+                                    <div className="grid grid-cols-2 gap-5">
+                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">板块分类</label><input name="category" defaultValue={editingTask.category} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="例如：顶层设计" disabled={saving} /></div>
+                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">序号标识 (可选)</label><input name="no" defaultValue={editingTask.no} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     </div>
                                     
-                                    <div><label className="block text-[11px] font-bold text-slate-500 mb-1">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" disabled={saving} /></div>
+                                    <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     
-                                    {/* 附件上传 */}
-                                    <div className="bg-slate-50 p-3 rounded border border-slate-100">
-                                        <label className="block text-[11px] font-bold text-slate-600 mb-2">📎 相关附件或链接 (支持图片/文档等)</label>
-                                        <div className="flex items-center space-x-2">
-                                            <label className={`px-3 py-1.5 border rounded text-[11px] font-medium transition-colors whitespace-nowrap ${uploadingObj.isUploading ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer'}`}>
-                                                {uploadingObj.isUploading ? `上传中 ${uploadingObj.progress}%` : '选择本地文件'}
+                                    {/* 附件模块 */}
+                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60">
+                                        <label className="flex items-center text-xs font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1">附件与相关链接</span></label>
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                                            <label className={`px-4 py-2 border rounded-lg text-xs font-medium transition-colors whitespace-nowrap shadow-sm flex items-center justify-center ${uploadingObj.isUploading ? 'bg-indigo-50 text-indigo-400 border-indigo-100 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 cursor-pointer'}`}>
+                                                <Icons.Upload /> <span className="ml-1.5">{uploadingObj.isUploading ? `上传中 ${uploadingObj.progress}%` : '上传本地文件'}</span>
                                                 <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploadingObj.isUploading || saving} />
                                             </label>
-                                            <div className="flex-1">
-                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-3 py-1.5 border border-slate-200 rounded text-[11px] text-blue-600 focus:outline-none focus:border-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
+                                            <div className="flex-1 w-full">
+                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
                                             </div>
                                         </div>
                                         {editingTask.attachmentName && (
-                                            <div className="text-[10px] text-slate-500 mt-2 flex items-center bg-white p-1 rounded border border-slate-100 inline-flex">
-                                                <span>📄 {editingTask.attachmentName}</span>
-                                                <button type="button" onClick={() => setEditingTask({...editingTask, attachmentName: '', attachmentUrl: ''})} className="ml-2 text-red-400 hover:text-red-600">删除</button>
+                                            <div className="mt-3 flex items-center inline-flex bg-white px-2.5 py-1.5 rounded-md border border-slate-200 shadow-sm">
+                                                <Icons.File /> <span className="ml-1.5 text-xs text-slate-600 font-medium max-w-[200px] truncate">{editingTask.attachmentName}</span>
+                                                <button type="button" onClick={() => setEditingTask({...editingTask, attachmentName: '', attachmentUrl: ''})} className="ml-3 text-slate-400 hover:text-red-500"><Icons.Edit style={{display:'none'}}/><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                             </div>
                                         )}
                                     </div>
 
-                                    <div><label className="block text-[11px] font-bold text-slate-500 mb-1">最新进展情况</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 whitespace-pre-wrap leading-relaxed" disabled={saving}></textarea></div>
-                                    <div><label className="block text-[11px] font-bold text-slate-500 mb-1">详细操作备注 (内部说明)</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-3 py-2 border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 whitespace-pre-wrap bg-white" disabled={saving}></textarea></div>
+                                    <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">最新进展</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
+                                    <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-5 pb-2">
                                         <div>
-                                            <label className="block text-[11px] font-bold text-slate-500 mb-1">当前进度状态</label>
-                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400" disabled={saving}>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1.5">进度状态</label>
+                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
                                                 <option value="To Do">待处理 (To Do)</option>
                                                 <option value="In progress">进行中 (In progress)</option>
                                                 <option value="Need Attention">🚨 Need Attention</option>
@@ -762,15 +786,15 @@
                                                 <option value="Done">已完成 (Done)</option>
                                             </select>
                                         </div>
-                                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1">主要负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400" placeholder="如：Finn, Lydia" disabled={saving} /></div>
+                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
                                     </div>
                                 </form>
                                 
-                                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-red-500 hover:text-red-600 text-[11px] font-medium">删除此记录</button> : <div></div>}
-                                    <div className="flex space-x-2">
-                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-4 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded">取消</button>
-                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-4 py-1.5 text-xs font-bold text-white rounded transition-colors ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                                <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
+                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-slate-400 hover:text-red-500 text-xs font-medium transition-colors">删除任务</button> : <div></div>}
+                                    <div className="flex space-x-3">
+                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-5 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
+                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-6 py-2 text-xs font-bold text-white rounded-lg transition-all shadow-sm ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5'}`}>
                                             {saving ? '保存中...' : (uploadingObj.isUploading ? '处理文件中' : '确认保存')}
                                         </button>
                                     </div>
@@ -779,31 +803,49 @@
                         </div>
                     )}
 
-                    {/* 导入 Excel 弹窗 */}
+                    {/* 导入弹窗 */}
                     {isImportModalOpen && (
-                        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
-                            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
-                                <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                    <h2 className="text-sm font-bold text-slate-700">批量导入</h2>
-                                    <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600" disabled={saving}>✕</button>
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col border border-slate-200/50">
+                                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                                    <h2 className="text-base font-bold text-slate-800">批量导入数据</h2>
+                                    <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><Icons.Alert style={{display:'none'}}/><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
-                                <div className="p-5">
-                                    <p className="text-xs text-slate-500 mb-2">请直接从 Excel 中框选并复制内容（需包含表头），粘贴到下方文本框。</p>
-                                    <textarea className="w-full h-40 p-3 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 text-xs" placeholder="在此粘贴..." value={importText} onChange={(e) => setImportText(e.target.value)} disabled={saving}></textarea>
+                                <div className="p-6">
+                                    <div className="mb-4 bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-indigo-800 mb-1">直接上传 CSV 文件</h3>
+                                            <p className="text-xs text-indigo-600">系统已适配您表格的格式，支持自动解析合并单元格与多行文本。</p>
+                                        </div>
+                                        <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-sm whitespace-nowrap">
+                                            选择文件
+                                            <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} disabled={saving} />
+                                        </label>
+                                    </div>
+                                    
+                                    <div className="flex items-center my-3">
+                                        <div className="flex-1 border-t border-slate-200"></div>
+                                        <span className="px-3 text-xs text-slate-400 font-medium">或者手动粘贴文本</span>
+                                        <div className="flex-1 border-t border-slate-200"></div>
+                                    </div>
+
+                                    <textarea className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs transition-colors leading-relaxed" placeholder="在此粘贴数据..." value={importText} onChange={(e) => setImportText(e.target.value)} disabled={saving}></textarea>
                                 </div>
-                                <div className="px-5 py-3 bg-slate-50 flex justify-end space-x-2">
-                                    <button onClick={() => setIsImportModalOpen(false)} className="px-4 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded" disabled={saving}>取消</button>
-                                    <button onClick={handleImportSubmit} className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded" disabled={saving}>
-                                        {saving ? '同步中...' : '解析并导入'}
+                                <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex justify-end space-x-3">
+                                    <button onClick={() => setIsImportModalOpen(false)} className="px-5 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm" disabled={saving}>取消</button>
+                                    <button onClick={handleImportSubmit} className="px-6 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all shadow-sm" disabled={saving}>
+                                        {saving ? '同步解析中...' : '解析并导入'}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
+                    {/* Toast 提示 */}
                     {toastMsg && (
-                        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 animate-bounce z-50">
-                            <span className="text-xs font-medium">{toastMsg}</span>
+                        <div className="fixed bottom-8 right-8 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 animate-bounce z-50">
+                            <Icons.Check />
+                            <span className="text-xs font-medium tracking-wide">{toastMsg}</span>
                         </div>
                     )}
                 </div>
