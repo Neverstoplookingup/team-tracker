@@ -4,24 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>团队协作工作台 - HC & Orbiva</title>
-    <!-- 引入 React 和 ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f1f5f9; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .drag-over { border: 2px dashed #6366f1 !important; background-color: rgba(99, 102, 241, 0.05) !important; }
+        .drag-over { background-color: rgba(99, 102, 241, 0.05) !important; outline: 2px dashed #818cf8; outline-offset: -2px; }
         .whitespace-pre-wrap { white-space: pre-wrap; word-wrap: break-word; }
+        
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+        
         .modal-overlay { animation: fadeIn 0.2s ease-out; }
         .modal-content { animation: slideUp 0.3s ease-out; }
         .live-dot { border-radius: 50%; animation: pulse-green 2s infinite; }
+        
+        /* 手风琴平滑过渡 */
+        .swimlane-content { transition: max-height 0.4s ease-in-out, opacity 0.4s ease-in-out; overflow: hidden; }
+        .swimlane-open { max-height: 3000px; opacity: 1; }
+        .swimlane-closed { max-height: 0; opacity: 0; }
+        
+        .accordion-content { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; overflow: hidden; }
+        .accordion-open { max-height: 2000px; opacity: 1; }
+        .accordion-closed { max-height: 0; opacity: 0; }
     </style>
 </head>
 <body>
@@ -31,6 +41,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // 您的专属 Firebase 配置
         const firebaseConfig = {
@@ -43,140 +54,224 @@
           measurementId: "G-J9014LF5NG"
         };
         
-        // 初始化真实的 Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
         
-        window.FB = { auth, db, doc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, signInAnonymously, onAuthStateChanged };
+        window.FB = { auth, db, storage, doc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, signInAnonymously, onAuthStateChanged, ref, uploadBytesResumable, getDownloadURL };
         window.dispatchEvent(new Event('firebase-loaded'));
     </script>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
-        const initialData = [
-            { id: 'task-init-1', category: '演示数据', no: '1', task: '删除这条记录，开始使用', detail: '这是为了防止看板为空而显示的示例数据，您可以直接删除它。', progress: '欢迎使用团队云端工作台！', status: 'To Do', assignee: 'Team', updatedAt: Date.now() }
-        ];
+        // 空数据初始化
+        const initialData = [];
 
-        // Excel 解析逻辑
-        const parsePastedData = (text) => {
-            let matrix = [];
-            if (text.indexOf('\t') !== -1) {
-                matrix = text.split('\n').map(row => row.split('\t').map(c => {
-                    let cell = c.trim();
-                    if (cell.startsWith('"') && cell.endsWith('"')) return cell.substring(1, cell.length - 1);
-                    return cell;
-                }));
-            } else {
-                let row = [], field = '', inQuotes = false;
-                for (let i = 0; i < text.length; i++) {
-                    let char = text[i];
-                    if (char === '"') {
-                        if (inQuotes && text[i+1] === '"') { field += '"'; i++; } else { inQuotes = !inQuotes; }
-                    } else if (char === ',' && !inQuotes) { row.push(field); field = ''; } 
-                    else if ((char === '\n' || (char === '\r' && text[i+1] === '\n')) && !inQuotes) {
-                        if (char === '\r') i++;
-                        row.push(field); matrix.push(row); row = []; field = '';
-                    } else { field += char; }
-                }
-                if (field || row.length > 0) { row.push(field); matrix.push(row); }
-            }
-            return matrix;
-        };
-
-        const processExcelData = (matrix) => {
-            if (!matrix || matrix.length < 2) return [];
-            const headers = matrix[0].map(h => h.trim().replace(/^"|"$/g, ''));
-            const colMap = {
-                category: Math.max(0, headers.findIndex(h => h.includes('分类') || h.includes('板块'))),
-                no: Math.max(1, headers.findIndex(h => h.includes('序号'))),
-                task: Math.max(2, headers.findIndex(h => h.includes('事项') || h.includes('项目'))),
-                detail: Math.max(3, headers.findIndex(h => h.includes('操作') || h.includes('详细') || h.includes('备注'))),
-                progress: Math.max(4, headers.findIndex(h => h.includes('进展') || h.includes('预期'))),
-                status: Math.max(5, headers.findIndex(h => h.includes('状态'))),
-                assignee: Math.max(6, headers.findIndex(h => h.includes('参与人') || h.includes('负责人'))),
-            };
-
-            let data = [], lastCat = "", lastNo = "", lastTask = "";
-            for (let i = 1; i < matrix.length; i++) {
-                const row = matrix[i];
-                if (!row || row.length === 0 || row.every(c => !c || c.trim() === '')) continue;
-                
-                const getCell = (idx) => (idx === -1 || idx >= row.length) ? "" : (row[idx] || "").trim().replace(/^"|"$/g, '');
-
-                let cat = getCell(colMap.category); if (cat) lastCat = cat; else cat = lastCat;
-                let no = getCell(colMap.no); if (no) lastNo = no; else no = lastNo;
-                let task = getCell(colMap.task); if (task) lastTask = task; else task = lastTask;
-                
-                let detail = getCell(colMap.detail), progress = getCell(colMap.progress);
-                let statusRaw = getCell(colMap.status) || "To Do", assignee = getCell(colMap.assignee);
-                if (!detail && !progress && !assignee && (!statusRaw || statusRaw === "To Do")) continue;
-
-                let status = "To Do";
-                const sLower = statusRaw.toLowerCase();
-                if (sLower.includes("progress") || sLower.includes("进行")) status = "In progress";
-                else if (sLower.includes("done") || sLower.includes("完成")) status = "Done";
-                else if (sLower.includes("pending") || sLower.includes("暂缓")) status = "Pending";
-                else if (statusRaw.trim()) status = statusRaw; 
-                
-                data.push({ id: `task-imp-${Date.now()}-${i}`, category: cat || "默认板块", no, task: task || "未命名事项", detail, progress, status, assignee: assignee || "未分配", updatedAt: Date.now() });
-            }
-            return data;
-        };
-
+        // ------------------------------------------
+        // 工具与配置 (轻量级色彩设计)
+        // ------------------------------------------
         const COLUMN_CONFIG = {
-            'To Do': { title: '待处理 (To Do)', bg: 'bg-slate-100', border: 'border-slate-200', text: 'text-slate-700', icon: '📝' },
-            'In progress': { title: '进行中 (In Progress)', bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-800', icon: '🚀' },
-            'Pending': { title: '等待/暂缓 (Pending)', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: '⏸️' },
-            'Done': { title: '已完成 (Done)', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', icon: '✅' }
+            'Need Attention': { title: 'Need Attention', borderTop: 'border-t-4 border-red-400', headerBg: 'bg-red-50/50', text: 'text-red-600', icon: '🚨' },
+            'To Do': { title: '待处理 (To Do)', borderTop: 'border-t-4 border-slate-300', headerBg: 'bg-slate-50', text: 'text-slate-600', icon: '📝' },
+            'In progress': { title: '进行中 (In progress)', borderTop: 'border-t-4 border-indigo-400', headerBg: 'bg-indigo-50/50', text: 'text-indigo-600', icon: '🚀' },
+            'Pending': { title: '等待/暂停 (Pending)', borderTop: 'border-t-4 border-amber-400', headerBg: 'bg-amber-50/50', text: 'text-amber-600', icon: '⏸️' },
+            'Done': { title: '已完成 (Done)', borderTop: 'border-t-4 border-emerald-400', headerBg: 'bg-emerald-50/50', text: 'text-emerald-600', icon: '✅' }
         };
 
         const generateId = () => 'task-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        
         const getInitials = (name) => {
             if (!name || name.trim() === '') return '?';
             const first = name.split(/[,&、]/)[0].trim();
             return /^[a-zA-Z]/.test(first) ? first.substring(0, 2).toUpperCase() : first.substring(0, 1);
         };
+        
         const stringToColor = (str) => {
             let hash = 0;
             for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
             return `hsl(${hash % 360}, 70%, 80%)`;
         };
-        const timeAgo = (timestamp) => {
+        
+        // 格式化时间：MM.DD.YYYY. HH:mm
+        const formatDateTime = (timestamp) => {
             if (!timestamp) return '';
-            const mins = Math.floor((Date.now() - timestamp) / 60000);
-            if (mins < 1) return '刚刚更新';
-            if (mins < 60) return `${mins} 分钟前`;
-            if (mins < 1440) return `${Math.floor(mins/60)} 小时前`;
-            return `${Math.floor(mins/1440)} 天前`;
+            const d = new Date(timestamp);
+            const pad = (n) => n.toString().padStart(2, '0');
+            const MM = pad(d.getMonth() + 1);
+            const DD = pad(d.getDate());
+            const YYYY = d.getFullYear();
+            const HH = pad(d.getHours());
+            const mm = pad(d.getMinutes());
+            return `${MM}.${DD}.${YYYY}. ${HH}:${mm}`;
         };
 
         const Avatar = ({ name }) => {
             const names = name ? name.split(/[,&、]/).map(n => n.trim()).filter(n => n) : [];
-            if (names.length === 0) return <div className="text-xs text-slate-400 border border-slate-200 px-2 py-0.5 rounded-full bg-slate-50">未分配</div>;
+            if (names.length === 0) return <div className="text-[10px] text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded bg-slate-50">未分配</div>;
             return (
-                <div className="flex -space-x-2 overflow-hidden">
+                <div className="flex -space-x-1.5 overflow-hidden items-center">
                     {names.slice(0, 3).map((n, i) => (
-                        <div key={i} className="inline-block w-7 h-7 rounded-full ring-2 ring-white flex items-center justify-center text-[10px] font-bold text-slate-700 shadow-sm" style={{ backgroundColor: stringToColor(n) }} title={n}>
+                        <div key={i} className="inline-block w-5 h-5 rounded-full ring-1 ring-white flex items-center justify-center text-[8px] font-bold text-slate-700 shadow-sm" style={{ backgroundColor: stringToColor(n) }} title={n}>
                             {getInitials(n)}
                         </div>
                     ))}
-                    {names.length > 3 && (
-                        <div className="inline-block w-7 h-7 rounded-full ring-2 ring-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shadow-sm">+{names.length - 3}</div>
-                    )}
+                    {names.length > 3 && <div className="inline-block w-5 h-5 rounded-full ring-1 ring-white bg-slate-100 flex items-center justify-center text-[8px] font-bold text-slate-600 shadow-sm">+{names.length - 3}</div>}
+                    {names.length === 1 && <span className="text-[10px] text-slate-500 ml-2 max-w-[50px] truncate">{names[0]}</span>}
                 </div>
             );
         };
+
+        const TaskCard = ({ task, onEdit, onDragStart, onDragEnd, hideCategoryLabel = false }) => {
+            const getFileIcon = (url) => {
+                if(!url) return '🔗';
+                const lowerUrl = url.toLowerCase();
+                if(lowerUrl.includes('.pdf')) return '📄';
+                if(lowerUrl.includes('.doc') || lowerUrl.includes('.docx')) return '📝';
+                if(lowerUrl.includes('.xls') || lowerUrl.includes('.xlsx') || lowerUrl.includes('.csv')) return '📊';
+                if(lowerUrl.includes('.ppt') || lowerUrl.includes('.pptx')) return '📽️';
+                if(lowerUrl.includes('.jpg') || lowerUrl.includes('.jpeg') || lowerUrl.includes('.png')) return '🖼️';
+                return '🔗';
+            };
+
+            return (
+                <div 
+                    draggable="true" 
+                    onDragStart={(e) => { e.dataTransfer.setData('taskId', task.id); e.currentTarget.style.opacity = '0.5'; if(onDragStart) onDragStart(e); }} 
+                    onDragEnd={(e) => { e.currentTarget.style.opacity = '1'; if(onDragEnd) onDragEnd(e); }} 
+                    onClick={() => onEdit(task)}
+                    className="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group relative overflow-hidden flex flex-col"
+                >
+                    <div className="absolute top-1.5 right-2 text-[9px] text-slate-400 font-medium bg-slate-50 px-1 py-0.5 rounded">
+                        {formatDateTime(task.updatedAt)}
+                    </div>
+
+                    <div className="flex justify-between items-start mb-1.5 pr-24">
+                        {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold rounded uppercase tracking-wider line-clamp-1">{task.category || '未分类'}</span>}
+                        {task.no && hideCategoryLabel && <span className="text-[10px] text-slate-400 font-mono">#{task.no}</span>}
+                    </div>
+                    
+                    <h4 className="font-semibold text-slate-800 text-sm mb-2 leading-snug group-hover:text-indigo-600 transition-colors">{task.task || '未命名事项'}</h4>
+                    
+                    {task.progress && (
+                        <div className="bg-slate-50 p-2 rounded text-xs text-slate-600 mb-2.5 border border-slate-100 flex-1">
+                            <div className="line-clamp-3 whitespace-pre-wrap">{task.progress}</div>
+                        </div>
+                    )}
+
+                    {task.attachmentUrl && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }}
+                            className="w-full text-left mb-2.5 px-2 py-1.5 bg-indigo-50/50 hover:bg-indigo-100 border border-indigo-100 rounded text-[11px] text-indigo-600 flex items-center space-x-1.5 transition-colors shadow-sm"
+                            title="点击下载 / 查看附件"
+                        >
+                            <span>{getFileIcon(task.attachmentName || task.attachmentUrl)}</span>
+                            <span className="truncate flex-1 font-medium">{task.attachmentName || '查看附件 / 链接'}</span>
+                        </button>
+                    )}
+                    
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 mt-1 mt-auto">
+                        <Avatar name={task.assignee} />
+                        <span className="text-[10px] text-indigo-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-indigo-50 px-1.5 py-0.5 rounded">✎ 编辑</span>
+                    </div>
+                </div>
+            );
+        };
+
+        // ------------------------------------------
+        // 可折叠的泳道组件 (Swimlane Group)
+        // ------------------------------------------
+        const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
+            const [isOpen, setIsOpen] = useState(true);
+
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all">
+                    {/* 泳道标题栏 (点击折叠) */}
+                    <button 
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="bg-slate-800 hover:bg-slate-700 transition-colors px-5 py-2.5 flex justify-between items-center w-full focus:outline-none"
+                    >
+                        <div className="flex items-center space-x-3">
+                            <svg className={`w-4 h-4 text-slate-300 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                            <h2 className="font-bold text-white text-sm tracking-wide">
+                                板块：{catName}
+                            </h2>
+                            <span className="text-[10px] text-slate-300 bg-slate-600/50 px-2 py-0.5 rounded-full font-mono">{catTasks.length} 项</span>
+                        </div>
+                    </button>
+                    
+                    {/* 泳道内部横向列 */}
+                    <div className={`swimlane-content bg-slate-50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}`}>
+                        <div className="flex overflow-x-auto p-4 space-x-4 min-h-[160px]">
+                            {columns.map(status => {
+                                const config = COLUMN_CONFIG[status];
+                                const colTasks = catTasks.filter(t => t.status === status);
+                                const dropKey = `${catName}-${status}`;
+                                const isDragOver = draggedOverCol === dropKey;
+
+                                return (
+                                    <div 
+                                        key={dropKey} 
+                                        onDragOver={(e) => onDragOver(e, dropKey)} 
+                                        onDragLeave={onDragLeave} 
+                                        onDrop={(e) => onDrop(e, status, catName)} 
+                                        className={`flex-shrink-0 w-[280px] flex flex-col rounded-lg bg-white shadow-sm transition-all duration-200 overflow-hidden ${config.borderTop} ${isDragOver ? 'drag-over' : 'border border-slate-200'}`}
+                                    >
+                                        <div className={`px-3 py-2 flex justify-between items-center border-b border-slate-100 ${config.headerBg}`}>
+                                            <h3 className={`font-bold text-[12px] flex items-center space-x-1.5 ${config.text}`}>
+                                                <span>{config.icon}</span><span>{config.title.split(' ')[0]}</span>
+                                            </h3>
+                                            <span className={`text-[10px] font-bold ${config.text} opacity-60 bg-white/60 px-1.5 rounded`}>{colTasks.length}</span>
+                                        </div>
+                                        <div className="p-2 flex-1 space-y-2 overflow-y-auto max-h-[500px] no-scrollbar bg-slate-50/30">
+                                            {colTasks.length === 0 ? (
+                                                <div className="h-full min-h-[60px] rounded flex items-center justify-center text-slate-300 text-[11px] opacity-0 hover:opacity-100 transition-opacity">拖拽至此</div>
+                                            ) : (
+                                                colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} hideCategoryLabel={true} />)
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ------------------------------------------
+        // 可折叠分类列表组件 (用于经典看板中的 To Do 列)
+        // ------------------------------------------
+        const CategoryAccordionGroup = ({ category, tasks, onEdit, onDragStart, onDragEnd }) => {
+            const [isOpen, setIsOpen] = useState(true);
+            return (
+                <div className="mb-3 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                    <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors text-left border-b border-slate-100">
+                        <div className="flex items-center space-x-2">
+                            <span className="text-[11px] font-bold text-slate-700">{category || '未分类'}</span>
+                            <span className="text-[9px] bg-slate-200 px-1.5 py-0.5 rounded-full text-slate-600 font-mono">{tasks.length}</span>
+                        </div>
+                        <svg className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div className={`accordion-content bg-slate-50/50 ${isOpen ? 'accordion-open' : 'accordion-closed'}`}>
+                        <div className="p-2 space-y-2">
+                            {tasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} onDragStart={onDragStart} onDragEnd={onDragEnd} hideCategoryLabel={true} />)}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
 
         const App = () => {
             const [tasks, setTasks] = useState([]);
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
             const [saving, setSaving] = useState(false);
-            const [notConfigured, setNotConfigured] = useState(false);
+            const [uploadingObj, setUploadingObj] = useState({ isUploading: false, progress: 0 });
 
-            const [view, setView] = useState('kanban'); 
+            const [view, setView] = useState('swimlane'); 
             const [searchTerm, setSearchTerm] = useState('');
             const [filterCategory, setFilterCategory] = useState('All');
             const [filterAssignee, setFilterAssignee] = useState('All');
@@ -187,66 +282,79 @@
             const [importText, setImportText] = useState('');
             const [toastMsg, setToastMsg] = useState('');
 
-            const showToast = (msg) => {
-                setToastMsg(msg);
-                setTimeout(() => setToastMsg(''), 3000);
-            };
+            const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
 
             // ------------------------------------------
             // 1. 初始化鉴权
             // ------------------------------------------
             useEffect(() => {
                 const initApp = () => {
-                    if (window.FIREBASE_NOT_CONFIGURED) {
-                        setNotConfigured(true);
-                        setLoading(false);
-                        return;
-                    }
-                    
                     if (window.FB && window.FB.auth) {
                         window.FB.signInAnonymously(window.FB.auth).catch(e => console.error("匿名登录失败:", e));
                         const unsub = window.FB.onAuthStateChanged(window.FB.auth, setUser);
                         return () => unsub();
                     }
                 };
-
-                if (window.FIREBASE_NOT_CONFIGURED !== undefined || window.FB) {
-                    initApp();
-                } else {
-                    window.addEventListener('firebase-loaded', initApp);
-                    return () => window.removeEventListener('firebase-loaded', initApp);
-                }
-                
-                const interval = setInterval(() => setTasks(prev => [...prev]), 60000);
-                return () => clearInterval(interval);
+                if (window.FB) initApp();
+                else window.addEventListener('firebase-loaded', initApp);
+                return () => window.removeEventListener('firebase-loaded', initApp);
             }, []);
 
             // ------------------------------------------
-            // 2. 实时数据库监听 (自己的 Firebase)
+            // 2. 实时数据库监听
             // ------------------------------------------
             useEffect(() => {
-                if (!user || notConfigured || !window.FB) return;
-
-                // 使用专门为个人部署设立的集合路径
+                if (!user || !window.FB) return;
                 const colRef = window.FB.collection(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks');
-                
                 const unsub = window.FB.onSnapshot(colRef, (snapshot) => {
                     const fetchedTasks = [];
                     snapshot.forEach(doc => fetchedTasks.push({ id: doc.id, ...doc.data() }));
-                    
                     setTasks(fetchedTasks);
                     setLoading(false);
                 }, (err) => {
-                    console.error("云同步异常:", err);
-                    alert("无法连接到数据库。如果您刚创建了 Firebase，请确保您的 Firestore 规则 (Rules) 是公开可读写的！\n规则应为：allow read, write: if true;");
+                    console.error("同步异常:", err);
+                    alert("连接数据库失败，请检查 Firestore Rules！");
                     setLoading(false);
                 });
-
                 return () => unsub();
-            }, [user, notConfigured]);
+            }, [user]);
 
             // ------------------------------------------
-            // 3. 数据操作 (云端真实写入)
+            // 3. 文件上传逻辑
+            // ------------------------------------------
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                if (file.size > 20 * 1024 * 1024) { alert('文件过大，请上传 20MB 以内的文件'); return; }
+
+                setUploadingObj({ isUploading: true, progress: 0 });
+                const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+                const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
+                
+                const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
+
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                        setUploadingObj({ isUploading: true, progress });
+                    }, 
+                    (error) => {
+                        alert('文件上传失败，请检查网络或 Storage Rules 配置');
+                        setUploadingObj({ isUploading: false, progress: 0 });
+                    }, 
+                    async () => {
+                        try {
+                            const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
+                            setEditingTask(prev => ({ ...prev, attachmentUrl: downloadURL, attachmentName: file.name }));
+                            showToast('附件已成功上传并生成链接！');
+                        } catch(err) { console.error(err); }
+                        finally { setUploadingObj({ isUploading: false, progress: 0 }); }
+                    }
+                );
+            };
+
+            // ------------------------------------------
+            // 4. 数据操作
             // ------------------------------------------
             const handleSaveTask = async (e) => {
                 e.preventDefault();
@@ -262,55 +370,104 @@
                     progress: formData.get('progress').trim(),
                     status: formData.get('status'),
                     assignee: formData.get('assignee').trim(),
+                    attachmentUrl: editingTask.attachmentUrl || '', 
+                    attachmentName: editingTask.attachmentName || '', 
                     updatedAt: Date.now()
                 };
 
                 try {
                     const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', taskId);
                     await window.FB.setDoc(docRef, taskData);
-                    showToast(editingTask.id ? '已同步更新至全团队' : '已发布新任务');
+                    showToast(editingTask.id ? '已同步更新' : '已发布任务');
                     setEditingTask(null);
-                } catch (error) { 
-                    alert("保存失败，请检查 Firestore Rules 权限设置。"); 
-                } 
+                } catch (error) { alert("保存失败！"); } 
                 finally { setSaving(false); }
             };
 
             const handleDeleteTask = async () => {
                 if(!editingTask.id) return;
-                if(confirm('确定要彻底删除这条记录吗？这会在所有人的屏幕上消失。')) {
+                if(confirm('彻底删除此记录？所有人均不可见。')) {
                     setSaving(true);
                     try {
                         const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', editingTask.id);
                         await window.FB.deleteDoc(docRef);
-                        showToast('任务已从云端彻底删除'); setEditingTask(null);
-                    } catch (error) { console.error(error); } 
+                        showToast('已删除'); setEditingTask(null);
+                    } catch (error) {} 
                     finally { setSaving(false); }
                 }
             };
 
-            const handleDrop = async (e, newStatus) => {
+            const handleDrop = async (e, newStatus, newCategory = null) => {
                 e.preventDefault();
                 setDraggedOverCol(null);
                 const taskId = e.dataTransfer.getData('taskId');
                 if (!taskId) return;
 
-                // 乐观 UI 更新（瞬间移动）
-                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updatedAt: Date.now() } : t));
-
-                // 异步后台同步
+                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, category: newCategory || t.category, updatedAt: Date.now() } : t));
                 if (user && window.FB) {
                     try {
                         const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', taskId);
-                        await window.FB.updateDoc(docRef, { status: newStatus, updatedAt: Date.now() });
-                    } catch (error) { showToast("状态同步失败，请检查权限"); }
+                        await window.FB.updateDoc(docRef, { status: newStatus, ...(newCategory && { category: newCategory }), updatedAt: Date.now() });
+                    } catch (error) { showToast("状态同步失败"); }
                 }
             };
 
             const handleImportSubmit = async () => {
                 if (!importText.trim()) return;
-                const parsedData = processExcelData(parsePastedData(importText));
-                if (parsedData.length === 0) { alert("未能解析出有效数据，请检查格式！"); return; }
+                let matrix = [];
+                if (importText.indexOf('\t') !== -1) {
+                    matrix = importText.split('\n').map(row => row.split('\t').map(c => { let cell = c.trim(); if (cell.startsWith('"') && cell.endsWith('"')) return cell.substring(1, cell.length - 1); return cell; }));
+                } else {
+                    let row = [], field = '', inQuotes = false;
+                    for (let i = 0; i < importText.length; i++) {
+                        let char = importText[i];
+                        if (char === '"') { if (inQuotes && importText[i+1] === '"') { field += '"'; i++; } else { inQuotes = !inQuotes; } } 
+                        else if (char === ',' && !inQuotes) { row.push(field); field = ''; } 
+                        else if ((char === '\n' || (char === '\r' && importText[i+1] === '\n')) && !inQuotes) { if (char === '\r') i++; row.push(field); matrix.push(row); row = []; field = ''; } 
+                        else { field += char; }
+                    }
+                    if (field || row.length > 0) { row.push(field); matrix.push(row); }
+                }
+
+                if (!matrix || matrix.length < 2) { alert("无有效数据"); return; }
+                const headers = matrix[0].map(h => h.trim().replace(/^"|"$/g, ''));
+                const colMap = {
+                    category: Math.max(0, headers.findIndex(h => h.includes('分类') || h.includes('板块'))),
+                    no: Math.max(1, headers.findIndex(h => h.includes('序号'))),
+                    task: Math.max(2, headers.findIndex(h => h.includes('事项') || h.includes('项目'))),
+                    detail: Math.max(3, headers.findIndex(h => h.includes('操作') || h.includes('详细') || h.includes('备注'))),
+                    progress: Math.max(4, headers.findIndex(h => h.includes('进展') || h.includes('预期'))),
+                    status: Math.max(5, headers.findIndex(h => h.includes('状态'))),
+                    assignee: Math.max(6, headers.findIndex(h => h.includes('参与人') || h.includes('负责人'))),
+                };
+
+                let parsedData = [], lastCat = "", lastNo = "", lastTask = "";
+                for (let i = 1; i < matrix.length; i++) {
+                    const row = matrix[i];
+                    if (!row || row.length === 0 || row.every(c => !c || c.trim() === '')) continue;
+                    
+                    const getCell = (idx) => (idx === -1 || idx >= row.length) ? "" : (row[idx] || "").trim().replace(/^"|"$/g, '');
+
+                    let cat = getCell(colMap.category); if (cat) lastCat = cat; else cat = lastCat;
+                    let no = getCell(colMap.no); if (no) lastNo = no; else no = lastNo;
+                    let task = getCell(colMap.task); if (task) lastTask = task; else task = lastTask;
+                    let detail = getCell(colMap.detail), progress = getCell(colMap.progress);
+                    let statusRaw = getCell(colMap.status) || "To Do", assignee = getCell(colMap.assignee);
+                    
+                    if (!detail && !progress && !assignee && (!statusRaw || statusRaw === "To Do")) continue;
+
+                    let status = "To Do";
+                    const sLower = statusRaw.toLowerCase();
+                    if (sLower.includes("attention") || sLower.includes("老板") || sLower.includes("关注")) status = "Need Attention";
+                    else if (sLower.includes("progress") || sLower.includes("进行")) status = "In progress";
+                    else if (sLower.includes("done") || sLower.includes("完成")) status = "Done";
+                    else if (sLower.includes("pending") || sLower.includes("暂缓") || sLower.includes("等待")) status = "Pending";
+                    else if (statusRaw.trim()) status = statusRaw; 
+                    
+                    parsedData.push({ id: `task-imp-${Date.now()}-${i}`, category: cat || "默认板块", no, task: task || "未命名事项", detail, progress, status, assignee: assignee || "未分配", attachmentUrl: '', attachmentName: '', updatedAt: Date.now() });
+                }
+
+                if (parsedData.length === 0) { alert("未能解析出有效数据！"); return; }
                 
                 setSaving(true);
                 try {
@@ -318,35 +475,20 @@
                         const docRef = window.FB.doc(window.FB.db, 'artifacts', 'github-deploy', 'public', 'data', 'kanban_tasks', t.id);
                         await window.FB.setDoc(docRef, t);
                     }
-                    showToast(`成功导入并同步 ${parsedData.length} 条数据！`);
+                    showToast(`成功导入 ${parsedData.length} 条数据！`);
                     setIsImportModalOpen(false); setImportText('');
                 } catch (error) { alert("批量同步失败"); }
                 finally { setSaving(false); }
             };
 
-            // ------------------------------------------
-            // 4. 共享链接与导出
-            // ------------------------------------------
-            const handleShare = () => {
-                const input = document.createElement('input');
-                input.value = window.location.href;
-                document.body.appendChild(input);
-                input.select();
-                try {
-                    document.execCommand('copy');
-                    showToast('🔗 协作链接已复制，快发给团队成员吧！');
-                } catch (err) {
-                    alert('请复制浏览器地址栏的链接进行分享');
-                }
-                document.body.removeChild(input);
-            };
-
             const handleExport = () => {
-                const headers = ['分类/板块', '序号', '重点事项', '具体说明', '进展情况', '状态', '参与人'];
+                const headers = ['分类/板块', '序号', '重点事项', '具体说明', '进展情况', '状态', '参与人', '附件链接', '最后更新时间'];
                 const rows = tasks.map(t => [
                     `"${(t.category||'').replace(/"/g, '""')}"`, `"${(t.no||'').replace(/"/g, '""')}"`,
                     `"${(t.task||'').replace(/"/g, '""')}"`, `"${(t.detail||'').replace(/"/g, '""')}"`,
-                    `"${(t.progress||'').replace(/"/g, '""')}"`, `"${(t.status||'').replace(/"/g, '""')}"`, `"${(t.assignee||'').replace(/"/g, '""')}"`
+                    `"${(t.progress||'').replace(/"/g, '""')}"`, `"${(t.status||'').replace(/"/g, '""')}"`, 
+                    `"${(t.assignee||'').replace(/"/g, '""')}"`, `"${(t.attachmentUrl||'').replace(/"/g, '""')}"`,
+                    `"${formatDateTime(t.updatedAt)}"`
                 ]);
                 const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
                 const link = document.createElement("a");
@@ -357,7 +499,7 @@
             };
 
             // ------------------------------------------
-            // 5. 数据过滤与衍生状态
+            // 5. 数据过滤与分组
             // ------------------------------------------
             const filteredTasks = useMemo(() => {
                 const sortedTasks = [...tasks].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -369,45 +511,16 @@
                 });
             }, [tasks, searchTerm, filterCategory, filterAssignee]);
 
-            const categories = useMemo(() => ['All', ...new Set(tasks.map(t => t.category).filter(Boolean))], [tasks]);
+            const dataCategories = useMemo(() => [...new Set(tasks.map(t => t.category).filter(Boolean).sort())], [tasks]);
+            const categories = ['All', ...dataCategories];
+            
             const assignees = useMemo(() => {
                 const set = new Set();
                 tasks.forEach(t => { if(t.assignee) t.assignee.split(/[,&、]/).forEach(a => { const n = a.trim(); if(n) set.add(n); }) });
                 return ['All', ...Array.from(set)];
             }, [tasks]);
             
-            const columns = useMemo(() => {
-                const cols = Object.keys(COLUMN_CONFIG);
-                tasks.forEach(t => { if (t.status && !cols.includes(t.status)) cols.push(t.status); });
-                return cols;
-            }, [tasks]);
-
-            // ------------------------------------------
-            // 渲染：未配置数据库的提示页面
-            // ------------------------------------------
-            if (notConfigured) {
-                return (
-                    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
-                        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-2xl w-full border border-red-100">
-                            <h1 className="text-2xl font-bold text-slate-800 mb-4 flex items-center">
-                                <span className="text-red-500 mr-2">⚠️</span> 缺少数据库配置，无法同步数据
-                            </h1>
-                            <div className="space-y-4 text-slate-600 text-sm leading-relaxed bg-slate-50 p-5 rounded-xl border border-slate-200">
-                                <p>您已将看板部署到了公共网络，但 <b>HTML 静态网页无法自己保存数据</b>。为了让您的团队能实时看到彼此的修改，您需要提供一个免费的 Firebase 数据库配置。</p>
-                                <h3 className="font-bold text-slate-800 mt-6">🔧 配置步骤：</h3>
-                                <ol className="list-decimal pl-5 space-y-2">
-                                    <li>前往 <a href="https://firebase.google.com/" target="_blank" className="text-blue-600 hover:underline font-medium">Firebase 官网</a> 创建一个免费项目。</li>
-                                    <li>在左侧菜单点击 <b>Build</b> -> <b>Firestore Database</b>，创建一个数据库，并选择 <b><span className="text-red-600">Start in test mode (测试模式)</span></b>。</li>
-                                    <li>在左侧菜单点击 <b>Build</b> -> <b>Authentication</b>，点击 <b>Sign-in method</b>，找到并启用 <b>Anonymous (匿名登录)</b>。</li>
-                                    <li>点击左上角设置齿轮 ⚙️ -> <b>Project settings</b>，滚动到底部添加一个 <b>Web App <code>&lt;/&gt;</code></b>。</li>
-                                    <li>系统会生成一段代码，请复制其中的 <code>firebaseConfig</code> 内容。</li>
-                                    <li>打开您代码的 <b>第 44 行</b>，将默认的文字替换为您复制的真实配置，重新推送到 GitHub 即可！</li>
-                                </ol>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
+            const columns = ['Need Attention', 'To Do', 'In progress', 'Pending', 'Done'];
 
             // ------------------------------------------
             // 渲染视图
@@ -415,69 +528,63 @@
             if (loading) {
                 return (
                     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                        <h2 className="text-slate-600 font-medium text-lg">正在连接并拉取云端数据...</h2>
+                        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                        <h2 className="text-slate-500 font-medium text-sm">加载工作台...</h2>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen flex flex-col h-screen overflow-hidden">
+                <div className="min-h-screen flex flex-col h-screen overflow-hidden bg-slate-50">
                     {/* 顶部导航 */}
-                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0 shadow-sm z-10 relative">
-                        <div className="flex items-center space-x-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-md flex items-center justify-center font-bold text-white text-xl">HC</div>
+                    <header className="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0 z-10 relative">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center font-bold text-white">HC</div>
                             <div>
-                                <h1 className="text-lg font-bold text-slate-800 leading-tight flex items-center">
-                                    团队协作工作台
-                                    <span className="ml-3 inline-flex items-center px-2 py-0.5 rounded-full border bg-green-50 border-green-200">
-                                        <span className="w-2 h-2 rounded-full mr-1.5 bg-green-500 live-dot"></span>
-                                        <span className="text-[10px] font-bold tracking-wide text-green-700">基于 GitHub Pages 部署 · 云端实时同步中</span>
+                                <h1 className="text-base font-bold text-slate-800 leading-tight flex items-center">
+                                    团队工作台
+                                    <span className="ml-3 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-green-700 bg-green-50 border border-green-200 tracking-wide">
+                                        <span className="w-1.5 h-1.5 rounded-full mr-1 bg-green-500 live-dot"></span>实时同步
                                     </span>
                                 </h1>
-                                <p className="text-xs text-slate-500 mt-0.5">多端实时更新 / 云端数据库共 {tasks.length} 项任务</p>
                             </div>
                         </div>
                         
                         <div className="flex items-center space-x-3">
-                            <button onClick={handleShare} className="hidden md:flex bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-colors items-center shadow-sm">
-                                🔗 复制网站链接
-                            </button>
-                            <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm transition-colors flex items-center">
-                                📊 从 Excel 导入云端
-                            </button>
-
-                            <div className="w-px h-6 bg-slate-200 mx-1"></div>
-
-                            <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
-                                <button onClick={() => setView('kanban')} className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${view === 'kanban' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>看板</button>
-                                <button onClick={() => setView('table')} className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${view === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>表格</button>
+                            <div className="flex bg-slate-100 rounded-md p-1 border border-slate-200">
+                                <button onClick={() => setView('swimlane')} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${view === 'swimlane' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>板块泳道</button>
+                                <button onClick={() => setView('kanban')} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${view === 'kanban' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>经典看板</button>
+                                <button onClick={() => setView('table')} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${view === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>表格</button>
                             </div>
 
-                            <button onClick={() => setEditingTask({ status: 'To Do' })} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-colors flex items-center ml-2">
-                                <span className="mr-1 text-lg leading-none">+</span> 新建任务
+                            <button onClick={() => setIsImportModalOpen(true)} className="bg-white text-slate-600 border border-slate-300 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-slate-50 transition-colors" title="批量导入">
+                                导入
+                            </button>
+
+                            <button onClick={() => setEditingTask({ status: 'To Do' })} className="bg-indigo-600 text-white px-4 py-1.5 rounded-md text-xs font-medium hover:bg-indigo-700 transition-colors">
+                                + 新建
                             </button>
                         </div>
                     </header>
 
-                    {/* 工具栏 (过滤 & 搜索) */}
-                    <div className="bg-slate-50/80 backdrop-blur border-b border-slate-200 px-6 py-2 flex items-center justify-between shrink-0">
+                    {/* 工具栏 */}
+                    <div className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between shrink-0">
                         <div className="flex items-center space-x-4 overflow-x-auto no-scrollbar py-1">
-                            <div className="flex items-center space-x-2 border-r border-slate-200 pr-4">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">看谁的</span>
+                            <div className="flex items-center space-x-2 border-r border-slate-100 pr-4">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">执行人</span>
                                 <select 
-                                    className="text-xs bg-white border border-slate-200 rounded-md py-1 px-2 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer"
+                                    className="text-xs bg-slate-50 border border-slate-200 rounded py-1 px-2 focus:ring-indigo-500 text-slate-600 cursor-pointer min-w-[90px]"
                                     value={filterAssignee} onChange={(e) => setFilterAssignee(e.target.value)}
                                 >
-                                    {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部人员' : a}</option>)}
+                                    {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部' : a}</option>)}
                                 </select>
                             </div>
                             
                             <div className="flex items-center space-x-2">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">板块</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">板块过滤</span>
                                 {categories.map(cat => (
-                                    <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors border ${filterCategory === cat ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'}`}>
-                                        {cat === 'All' ? '显示全部' : cat}
+                                    <button key={cat} onClick={() => setFilterCategory(cat)} className={`px-2.5 py-1 rounded text-[11px] font-medium whitespace-nowrap transition-colors border ${filterCategory === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                                        {cat === 'All' ? '全部' : cat}
                                     </button>
                                 ))}
                             </div>
@@ -486,60 +593,72 @@
                         <div className="flex items-center space-x-2">
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-slate-400 text-xs">🔍</span>
-                                <input type="text" placeholder="全局搜索..." className="pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48 shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" placeholder="搜索..." className="pl-7 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-40" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
-                            <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded transition-colors" title="备份导出当前数据"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></button>
+                            <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-1 rounded" title="导出数据"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg></button>
                         </div>
                     </div>
 
                     {/* 主内容区 */}
                     <main className="flex-1 overflow-hidden p-6 relative">
-                        {view === 'kanban' ? (
-                            <div className="flex h-full space-x-6 overflow-x-auto no-scrollbar pb-4 items-start">
+                        {tasks.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+                                <div className="text-4xl mb-3 opacity-50">📭</div>
+                                <h3 className="text-base font-medium text-slate-600 mb-1">空空如也</h3>
+                                <p className="text-xs mb-4">暂无数据，请新建或导入。</p>
+                            </div>
+                        ) : view === 'swimlane' ? (
+                            /* 全新轻量级折叠泳道视图 */
+                            <div className="h-full overflow-y-auto pr-2 pb-10 space-y-5">
+                                {(filterCategory === 'All' ? dataCategories : [filterCategory]).map(catName => {
+                                    const catTasks = filteredTasks.filter(t => t.category === catName);
+                                    if (catTasks.length === 0) return null;
+
+                                    return (
+                                        <CollapsibleSwimlane 
+                                            key={catName} 
+                                            catName={catName} 
+                                            columns={columns} 
+                                            catTasks={catTasks} 
+                                            draggedOverCol={draggedOverCol}
+                                            onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }}
+                                            onDragLeave={() => setDraggedOverCol(null)}
+                                            onDrop={handleDrop}
+                                            onEdit={setEditingTask}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ) : view === 'kanban' ? (
+                            /* 经典轻量看板视图 */
+                            <div className="flex h-full space-x-5 overflow-x-auto no-scrollbar pb-4 items-start">
                                 {columns.map(status => {
+                                    const config = COLUMN_CONFIG[status];
                                     const colTasks = filteredTasks.filter(t => t.status === status);
-                                    const config = COLUMN_CONFIG[status] || { title: status, bg: 'bg-slate-100', border: 'border-slate-200', text: 'text-slate-700', icon: '📌' };
                                     const isDragOver = draggedOverCol === status;
 
                                     return (
                                         <div 
                                             key={status} onDragOver={(e) => { e.preventDefault(); setDraggedOverCol(status); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={(e) => handleDrop(e, status)}
-                                            className={`flex-shrink-0 w-80 max-h-full flex flex-col rounded-2xl border ${config.bg} ${config.border} transition-all duration-200 ${isDragOver ? 'ring-2 ring-indigo-400 scale-[1.02] shadow-lg' : ''}`}
+                                            className={`flex-shrink-0 w-[300px] max-h-full flex flex-col rounded-xl bg-white shadow-sm transition-all duration-200 overflow-hidden ${config.borderTop} ${isDragOver ? 'drag-over' : 'border-x border-b border-slate-200'}`}
                                         >
-                                            <div className="px-4 py-3 flex justify-between items-center rounded-t-2xl">
-                                                <h3 className={`font-bold text-sm flex items-center space-x-2 ${config.text}`}><span>{config.icon}</span><span>{config.title}</span></h3>
-                                                <span className="bg-white/60 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">{colTasks.length}</span>
+                                            <div className={`px-4 py-2.5 flex justify-between items-center border-b border-slate-100 ${config.headerBg}`}>
+                                                <h3 className={`font-bold text-[13px] flex items-center space-x-1.5 ${config.text}`}><span>{config.icon}</span><span>{config.title}</span></h3>
+                                                <span className={`text-[10px] font-bold ${config.text} opacity-70 bg-white/70 px-2 py-0.5 rounded`}>{colTasks.length}</span>
                                             </div>
-                                            
-                                            <div className="p-3 flex-1 overflow-y-auto no-scrollbar space-y-3">
+                                            <div className="p-3 flex-1 overflow-y-auto no-scrollbar space-y-3 bg-slate-50/30">
                                                 {colTasks.length === 0 ? (
-                                                    <div className="h-20 border-2 border-dashed border-slate-300/50 rounded-xl flex items-center justify-center text-slate-400 text-sm">拖拽卡片至此</div>
+                                                    <div className="h-20 border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 text-xs">拖拽至此</div>
                                                 ) : (
-                                                    colTasks.map(task => (
-                                                        <div 
-                                                            key={task.id} draggable="true" onDragStart={(e) => { e.dataTransfer.setData('taskId', task.id); e.currentTarget.style.opacity = '0.5'; }} onDragEnd={(e) => { e.currentTarget.style.opacity = '1'; }} onClick={() => setEditingTask(task)}
-                                                            className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group relative overflow-hidden"
-                                                        >
-                                                            <div className="absolute top-2 right-3 text-[10px] text-slate-400 font-medium bg-slate-50 px-1.5 py-0.5 rounded">
-                                                                {timeAgo(task.updatedAt)}
-                                                            </div>
-
-                                                            <div className="flex justify-between items-start mb-2 pr-16">
-                                                                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase tracking-wider">{task.category || '未分类'}</span>
-                                                            </div>
-                                                            <h4 className="font-semibold text-slate-800 text-sm mb-2 leading-snug group-hover:text-indigo-600 transition-colors">{task.task || '未命名事项'}</h4>
-                                                            {task.progress && (
-                                                                <div className="bg-blue-50/50 p-2 rounded text-xs text-blue-800 mb-3 border border-blue-100">
-                                                                    <div className="font-semibold mb-0.5 opacity-80">当前进展:</div>
-                                                                    <div className="line-clamp-3 whitespace-pre-wrap">{task.progress}</div>
-                                                                </div>
-                                                            )}
-                                                            <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-1">
-                                                                <Avatar name={task.assignee} />
-                                                                <span className="text-[10px] text-indigo-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center bg-indigo-50 px-2 py-1 rounded">✎ 修改并同步</span>
-                                                            </div>
-                                                        </div>
-                                                    ))
+                                                    status === 'To Do' ? (
+                                                        categories.slice(1).map(catName => {
+                                                            const catTasks = colTasks.filter(t => t.category === catName);
+                                                            if (catTasks.length === 0) return null;
+                                                            return <CategoryAccordionGroup key={catName} category={catName} tasks={catTasks} onEdit={setEditingTask} />
+                                                        })
+                                                    ) : (
+                                                        colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={setEditingTask} />)
+                                                    )
                                                 )}
                                             </div>
                                         </div>
@@ -547,35 +666,41 @@
                                 })}
                             </div>
                         ) : (
-                            <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                            /* 表格视图 */
+                            <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                                 <div className="overflow-auto flex-1 relative">
                                     <table className="min-w-full divide-y divide-slate-200">
                                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-32">板块</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">进展/预期</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-24">状态</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-32">参与人</th>
-                                                <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider w-24">最后更新</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-32">板块</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-1/4">重点事项</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider">进展/预期</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-28">状态</th>
+                                                <th className="px-4 py-3 text-left text-[11px] font-medium text-slate-400 uppercase tracking-wider w-28">参与人</th>
+                                                <th className="px-4 py-3 text-right text-[11px] font-medium text-slate-400 uppercase tracking-wider w-32">最后更新</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
-                                            {filteredTasks.map(task => (
-                                                <tr key={task.id} onClick={() => setEditingTask(task)} className="hover:bg-indigo-50/50 transition-colors cursor-pointer group">
-                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-600"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{task.category}</span></td>
-                                                    <td className="px-4 py-4 text-sm text-slate-900 font-medium">{task.task} {task.no && <span className="ml-2 text-xs text-slate-400 font-normal">#{task.no}</span>}</td>
-                                                    <td className="px-4 py-4 text-sm text-slate-600"><div className="line-clamp-2 whitespace-pre-wrap">{task.progress || <span className="text-slate-300 italic">无记录</span>}</div></td>
-                                                    <td className="px-4 py-4 whitespace-nowrap">
-                                                        <span className={`px-2.5 py-1 inline-flex text-[10px] leading-5 font-semibold rounded-full border ${task.status === 'Done' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : task.status === 'In progress' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>
-                                                            {task.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-4 whitespace-nowrap"><Avatar name={task.assignee} /></td>
-                                                    <td className="px-4 py-4 whitespace-nowrap text-right text-xs text-slate-400">{timeAgo(task.updatedAt)}</td>
-                                                </tr>
-                                            ))}
-                                            {filteredTasks.length === 0 && <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">当前视图无数据</td></tr>}
+                                            {filteredTasks.map(task => {
+                                                const config = COLUMN_CONFIG[task.status];
+                                                return (
+                                                    <tr key={task.id} onClick={() => setEditingTask(task)} className="hover:bg-slate-50 transition-colors cursor-pointer group">
+                                                        <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500"><span className="bg-slate-100 px-1.5 py-0.5 rounded">{task.category}</span></td>
+                                                        <td className="px-4 py-3 text-xs text-slate-800 font-medium">
+                                                            {task.task} {task.no && <span className="ml-1 text-[9px] text-slate-400">#{task.no}</span>}
+                                                            {task.attachmentUrl && <span className="ml-1 text-[9px] text-blue-500 bg-blue-50 px-1 rounded" title="包含附件">📎</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-xs text-slate-500"><div className="line-clamp-1 whitespace-pre-wrap">{task.progress || '-'}</div></td>
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            <span className={`px-2 py-0.5 inline-flex text-[10px] leading-5 font-medium rounded border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                                {config?.title.split(' ')[0] || task.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap"><Avatar name={task.assignee} /></td>
+                                                        <td className="px-4 py-3 whitespace-nowrap text-right text-[10px] text-slate-400">{formatDateTime(task.updatedAt)}</td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -583,48 +708,70 @@
                         )}
                     </main>
 
-                    {/* 模态框：编辑/新增卡片 */}
+                    {/* 编辑/新增 弹窗 */}
                     {editingTask && (
-                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
-                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content border border-slate-100">
-                                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                    <h2 className="text-lg font-bold text-slate-800 flex items-center">
-                                        {editingTask.id ? '多人协作 · 实时编辑' : '创建新任务'}
-                                        {saving && <span className="ml-3 text-xs text-indigo-500 font-normal flex items-center">...正在云端同步</span>}
+                        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content">
+                                <div className="px-6 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                    <h2 className="text-base font-bold text-slate-700 flex items-center">
+                                        {editingTask.id ? '编辑任务' : '新建任务'}
+                                        {saving && <span className="ml-3 text-[10px] text-indigo-500 font-normal">正在同步...</span>}
                                     </h2>
-                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 transition-colors p-1" disabled={saving}>✕</button>
+                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-600" disabled={saving || uploadingObj.isUploading}>✕</button>
                                 </div>
                                 
-                                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-5">
-                                    <div className="grid grid-cols-2 gap-5">
-                                        <div><label className="block text-xs font-medium text-slate-500 mb-1">板块 / 分类</label><input name="category" defaultValue={editingTask.category} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="例如：顶层设计" disabled={saving} /></div>
-                                        <div><label className="block text-xs font-medium text-slate-500 mb-1">序号 (可选)</label><input name="no" defaultValue={editingTask.no} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm" disabled={saving} /></div>
+                                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1">板块分类</label><input name="category" defaultValue={editingTask.category} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="例如：顶层设计" disabled={saving} /></div>
+                                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1">序号标识 (可选)</label><input name="no" defaultValue={editingTask.no} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" disabled={saving} /></div>
                                     </div>
                                     
-                                    <div><label className="block text-xs font-medium text-slate-500 mb-1">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-medium text-slate-900" disabled={saving} /></div>
-                                    <div><label className="block text-xs font-medium text-slate-500 mb-1">进展情况及预期 (将高亮展示在团队看板上)</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm whitespace-pre-wrap leading-relaxed" disabled={saving}></textarea></div>
-                                    <div><label className="block text-xs font-medium text-slate-500 mb-1">具体操作 / 详细说明 (长文本备注)</label><textarea name="detail" defaultValue={editingTask.detail} rows="3" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm whitespace-pre-wrap leading-relaxed bg-slate-50" disabled={saving}></textarea></div>
+                                    <div><label className="block text-[11px] font-bold text-slate-500 mb-1">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm font-medium text-slate-800 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" disabled={saving} /></div>
+                                    
+                                    {/* 附件上传 */}
+                                    <div className="bg-slate-50 p-3 rounded border border-slate-100">
+                                        <label className="block text-[11px] font-bold text-slate-600 mb-2">📎 相关附件或链接 (支持图片/文档等)</label>
+                                        <div className="flex items-center space-x-2">
+                                            <label className={`px-3 py-1.5 border rounded text-[11px] font-medium transition-colors whitespace-nowrap ${uploadingObj.isUploading ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-slate-200' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100 cursor-pointer'}`}>
+                                                {uploadingObj.isUploading ? `上传中 ${uploadingObj.progress}%` : '选择本地文件'}
+                                                <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploadingObj.isUploading || saving} />
+                                            </label>
+                                            <div className="flex-1">
+                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-3 py-1.5 border border-slate-200 rounded text-[11px] text-blue-600 focus:outline-none focus:border-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
+                                            </div>
+                                        </div>
+                                        {editingTask.attachmentName && (
+                                            <div className="text-[10px] text-slate-500 mt-2 flex items-center bg-white p-1 rounded border border-slate-100 inline-flex">
+                                                <span>📄 {editingTask.attachmentName}</span>
+                                                <button type="button" onClick={() => setEditingTask({...editingTask, attachmentName: '', attachmentUrl: ''})} className="ml-2 text-red-400 hover:text-red-600">删除</button>
+                                            </div>
+                                        )}
+                                    </div>
 
-                                    <div className="grid grid-cols-2 gap-5 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <div><label className="block text-[11px] font-bold text-slate-500 mb-1">最新进展情况</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 whitespace-pre-wrap leading-relaxed" disabled={saving}></textarea></div>
+                                    <div><label className="block text-[11px] font-bold text-slate-500 mb-1">详细操作备注 (内部说明)</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-3 py-2 border border-slate-200 rounded text-xs focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 whitespace-pre-wrap bg-white" disabled={saving}></textarea></div>
+
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs font-medium text-slate-500 mb-1">当前状态</label>
-                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm bg-white" disabled={saving}>
+                                            <label className="block text-[11px] font-bold text-slate-500 mb-1">当前进度状态</label>
+                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400" disabled={saving}>
                                                 <option value="To Do">待处理 (To Do)</option>
-                                                <option value="In progress">进行中 (In Progress)</option>
-                                                <option value="Pending">等待/暂缓 (Pending)</option>
+                                                <option value="In progress">进行中 (In progress)</option>
+                                                <option value="Need Attention">🚨 Need Attention</option>
+                                                <option value="Pending">等待/暂停 (Pending)</option>
                                                 <option value="Done">已完成 (Done)</option>
                                             </select>
                                         </div>
-                                        <div><label className="block text-xs font-medium text-slate-500 mb-1">主要参与人 (逗号分隔)</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm bg-white" placeholder="如：Finn, Lydia" disabled={saving} /></div>
+                                        <div><label className="block text-[11px] font-bold text-slate-500 mb-1">主要负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-1.5 border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-400" placeholder="如：Finn, Lydia" disabled={saving} /></div>
                                     </div>
                                 </form>
                                 
-                                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded-lg text-sm transition-colors">彻底删除</button> : <div></div>}
-                                    <div className="flex space-x-3">
-                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving} className="px-5 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-lg font-medium">取消</button>
-                                        <button type="submit" form="task-form" disabled={saving} className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm">
-                                            {saving ? '保存中...' : '✨ 立即同步至团队'}
+                                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-red-500 hover:text-red-600 text-[11px] font-medium">删除此记录</button> : <div></div>}
+                                    <div className="flex space-x-2">
+                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-4 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded">取消</button>
+                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-4 py-1.5 text-xs font-bold text-white rounded transition-colors ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+                                            {saving ? '保存中...' : (uploadingObj.isUploading ? '处理文件中' : '确认保存')}
                                         </button>
                                     </div>
                                 </div>
@@ -632,45 +779,31 @@
                         </div>
                     )}
 
-                    {/* 模态框：导入 Excel */}
+                    {/* 导入 Excel 弹窗 */}
                     {isImportModalOpen && (
-                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
-                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] modal-content">
-                                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                    <h2 className="text-lg font-bold text-slate-800">📊 从 Excel 批量覆盖/追加到云端</h2>
+                        <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
+                            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col">
+                                <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                    <h2 className="text-sm font-bold text-slate-700">批量导入</h2>
                                     <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600" disabled={saving}>✕</button>
                                 </div>
-                                
-                                <div className="p-6 flex-1 overflow-y-auto">
-                                    <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-xl mb-4 border border-blue-100">
-                                        <p className="font-bold mb-1">操作步骤：</p>
-                                        <ol className="list-decimal pl-5 space-y-1 text-blue-700">
-                                            <li>在您的 Excel/WPS 中框选需要导入的行（<b>需包含表头</b>）。</li>
-                                            <li>按 <code>Ctrl+C</code> 复制。</li>
-                                            <li>在下方文本框按 <code>Ctrl+V</code> 粘贴，点击确认。</li>
-                                        </ol>
-                                        <p className="mt-2 text-xs text-blue-600">注：这将把表格中的任务批量写入云端。如有重复事项，建议在导入后手动删除。</p>
-                                    </div>
-                                    <textarea 
-                                        className="w-full h-48 p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-mono text-sm whitespace-pre"
-                                        placeholder="请在此处粘贴 Excel 内容..." value={importText} onChange={(e) => setImportText(e.target.value)} disabled={saving}
-                                    ></textarea>
+                                <div className="p-5">
+                                    <p className="text-xs text-slate-500 mb-2">请直接从 Excel 中框选并复制内容（需包含表头），粘贴到下方文本框。</p>
+                                    <textarea className="w-full h-40 p-3 border border-slate-200 rounded focus:outline-none focus:border-indigo-400 text-xs" placeholder="在此粘贴..." value={importText} onChange={(e) => setImportText(e.target.value)} disabled={saving}></textarea>
                                 </div>
-                                
-                                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end space-x-3">
-                                    <button onClick={() => setIsImportModalOpen(false)} className="px-5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg" disabled={saving}>取消</button>
-                                    <button onClick={handleImportSubmit} className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm" disabled={saving}>
-                                        {saving ? '正在同步至云端...' : '🚀 解析并同步至所有设备'}
+                                <div className="px-5 py-3 bg-slate-50 flex justify-end space-x-2">
+                                    <button onClick={() => setIsImportModalOpen(false)} className="px-4 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded" disabled={saving}>取消</button>
+                                    <button onClick={handleImportSubmit} className="px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded" disabled={saving}>
+                                        {saving ? '同步中...' : '解析并导入'}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 全局 Toast */}
                     {toastMsg && (
-                        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-lg flex items-center space-x-3 animate-bounce z-50">
-                            <span className="text-xl">✨</span><span className="text-sm font-medium">{toastMsg}</span>
+                        <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-4 py-2 rounded shadow-lg flex items-center space-x-2 animate-bounce z-50">
+                            <span className="text-xs font-medium">{toastMsg}</span>
                         </div>
                     )}
                 </div>
