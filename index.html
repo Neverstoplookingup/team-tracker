@@ -40,11 +40,9 @@
         /* 动画效果 */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
         
         .modal-overlay { animation: fadeIn 0.2s ease-out forwards; }
         .modal-content { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .live-dot { border-radius: 50%; animation: pulse-green 2s infinite; }
         
         /* 平滑过渡 */
         .smooth-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
@@ -330,7 +328,7 @@
 
             const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
 
-            // 1. 鉴权初始化 (严格遵循 Rule 3)
+            // 1. 鉴权初始化
             useEffect(() => {
                 const initAuth = async () => {
                     if (window.FB && window.FB.auth) {
@@ -360,7 +358,7 @@
                 return () => { if(unsub) unsub(); window.removeEventListener('firebase-loaded', setupListener); };
             }, []);
 
-            // 2. 数据库监听与智能自愈 (严格遵循 Rule 1)
+            // 2. 数据库监听与智能自愈
             useEffect(() => {
                 if (!user || !window.FB) return;
                 
@@ -415,49 +413,49 @@
 
             // 附件文件上传 (带全局防崩溃保护)
             const handleFileUpload = async (e) => {
-                try {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (file.size > 20 * 1024 * 1024) { alert('文件过大，请上传 20MB 以内的文件'); return; }
+                const fileInput = e.target;
+                const file = fileInput.files[0];
+                if (!file) return;
 
-                    setUploadingObj({ isUploading: true, progress: 0 });
-                    const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-                    
+                if (file.size > 20 * 1024 * 1024) { 
+                    alert('文件过大，请上传 20MB 以内的文件'); 
+                    fileInput.value = '';
+                    return; 
+                }
+
+                setUploadingObj({ isUploading: true, progress: 0 });
+
+                try {
                     if (!window.FB || !window.FB.storage) {
                         throw new Error("存储服务尚未初始化");
                     }
+
+                    const safeName = `${Date.now()}_${encodeURIComponent(file.name)}`;
                     const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
                     const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
 
-                    uploadTask.on('state_changed', 
-                        (snapshot) => {
-                            const prog = snapshot.totalBytes > 0 ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
-                            setUploadingObj({ isUploading: true, progress: prog });
-                        }, 
-                        (error) => { 
-                            console.error("Upload error:", error);
-                            alert('上传失败: ' + error.message); 
-                            setUploadingObj({ isUploading: false, progress: 0 }); 
-                        }, 
-                        async () => {
-                            try {
-                                const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
-                                setEditingTask(prev => prev ? { ...prev, attachmentUrl: downloadURL, attachmentName: file.name } : null);
-                                showToast('附件上传成功！');
-                            } catch(err) {
-                                console.error("URL fetch error:", err);
-                                alert("获取链接失败");
-                            } finally { 
-                                setUploadingObj({ isUploading: false, progress: 0 }); 
-                            }
-                        }
-                    );
+                    // 使用 Promise 封装监听器，以便安全地 await 整个过程
+                    await new Promise((resolve, reject) => {
+                        uploadTask.on('state_changed', 
+                            (snapshot) => {
+                                const prog = snapshot.totalBytes > 0 ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+                                setUploadingObj({ isUploading: true, progress: prog });
+                            }, 
+                            (error) => reject(error),
+                            () => resolve()
+                        );
+                    });
+
+                    const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
+                    setEditingTask(prev => prev ? { ...prev, attachmentUrl: downloadURL, attachmentName: file.name } : null);
+                    showToast('附件上传成功！');
                 } catch (error) {
-                    console.error("File input error:", error);
-                    alert("本地读取异常，请刷新后重试。");
-                    setUploadingObj({ isUploading: false, progress: 0 });
+                    console.error("Upload error:", error);
+                    alert('上传失败: ' + (error.message || '未知错误'));
                 } finally {
-                    e.target.value = ''; // 重置 file input 防止再次选择同文件不生效
+                    setUploadingObj({ isUploading: false, progress: 0 });
+                    // 确保在所有异步操作（读取完毕）后再清空 input
+                    fileInput.value = ''; 
                 }
             };
 
@@ -539,23 +537,28 @@
                 }
             };
 
-            // CSV 读取异常保护
+            // CSV 读取异常保护（修复引发页面崩溃的根源）
             const handleCsvUpload = (e) => {
+                const fileInput = e.target;
+                const file = fileInput.files[0];
+                if (!file) return;
+
                 try {
-                    const file = e.target.files[0];
-                    if (!file) return;
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         setImportText(event.target.result);
                         showToast("文件读取成功，请检查内容并点击「解析并导入」");
+                        fileInput.value = ''; // 读取成功后再清空
                     };
-                    reader.onerror = () => alert("读取文件发生异常，请检查文件权限");
+                    reader.onerror = () => {
+                        alert("读取文件发生异常，请检查文件权限");
+                        fileInput.value = ''; // 发生错误时清空
+                    };
                     reader.readAsText(file);
                 } catch (error) {
                     console.error("CSV Read Error:", error);
                     alert("加载文件发生异常！");
-                } finally {
-                    e.target.value = ''; // 重置 input
+                    fileInput.value = ''; // 捕获异常后清空
                 }
             };
 
@@ -737,9 +740,6 @@
                             <div>
                                 <h1 className="text-[15px] font-bold text-slate-800 flex items-center">
                                     协同工作台
-                                    <span className="ml-3 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200">
-                                        <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-emerald-500 live-dot"></span>实时联机
-                                    </span>
                                 </h1>
                             </div>
                         </div>
@@ -830,7 +830,7 @@
                                 })}
                             </div>
                         ) : filters.view === 'swimlane' ? (
-                            // 原泳道视图，已改名为 "板块概览" 且排在看板后
+                            // 板块概览
                             <div className="h-full overflow-y-auto pr-2 pb-10">
                                 {(filters.category === 'All' ? categories.slice(1) : [filters.category]).map(catName => {
                                     const catTasks = filteredTasks.filter(t => t.category === catName);
