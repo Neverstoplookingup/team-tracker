@@ -176,12 +176,19 @@
                     onDragStart={handleDragStart} 
                     onDragEnd={handleDragEnd} 
                     onClick={() => onEdit(task)}
-                    className="bg-white p-3.5 rounded-xl border border-slate-200 cursor-grab active:cursor-grabbing hover:border-indigo-300 hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px]"
+                    className={`bg-white p-3.5 rounded-xl border cursor-grab active:cursor-grabbing hover:border-indigo-300 hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${task.isUrgent ? 'border-red-200' : 'border-slate-200'}`}
                 >
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex flex-wrap gap-1.5 pr-8">
                             {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">{task.category || '未分类'}</span>}
                             {task.no && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 text-[10px] font-mono rounded-md">#{task.no}</span>}
+                            
+                            {/* 当标记为 Urgent 且在 Need Attention 栏时，显示其真实的子状态 */}
+                            {task.isUrgent && (
+                                <span className="px-1.5 py-0.5 border border-red-200 bg-red-50 text-red-600 text-[10px] font-bold rounded-md flex items-center shadow-sm">
+                                    🚨 {COLUMN_CONFIG[task.status]?.title.split(' ')[0] || task.status}
+                                </span>
+                            )}
                         </div>
                     </div>
                     
@@ -221,7 +228,7 @@
             );
         };
 
-        // UI 组件: 可折叠泳道
+        // UI 组件: 可折叠板块概览 (原泳道)
         const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
             const [isOpen, setIsOpen] = useState(true);
 
@@ -242,7 +249,11 @@
                         <div className="flex overflow-x-auto p-4 space-x-4 min-h-[200px]">
                             {columns.map(status => {
                                 const config = COLUMN_CONFIG[status];
-                                const colTasks = catTasks.filter(t => t.status === status);
+                                // 分配任务逻辑与看板保持一致
+                                const colTasks = catTasks.filter(t => {
+                                    if (status === 'Need Attention') return t.isUrgent === true;
+                                    return t.status === status && !t.isUrgent;
+                                });
                                 const dropKey = `${catName}-${status}`;
                                 const isDragOver = draggedOverCol === dropKey;
 
@@ -285,8 +296,8 @@
             const [saving, setSaving] = useState(false);
             const [uploadingObj, setUploadingObj] = useState({ isUploading: false, progress: 0 });
 
-            // 统一筛选状态
-            const [filters, setFilters] = useState({ view: 'swimlane', search: '', category: 'All', assignee: 'All' });
+            // 将 Kanban 置为默认视图
+            const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All' });
             const [draggedOverCol, setDraggedOverCol] = useState(null);
             
             const [editingTask, setEditingTask] = useState(null);
@@ -326,18 +337,38 @@
                 return () => { if(unsub) unsub(); window.removeEventListener('firebase-loaded', setupListener); };
             }, []);
 
-            // 2. 数据库监听 (严格遵循 Rule 1)
+            // 2. 数据库监听与智能自愈 (严格遵循 Rule 1)
             useEffect(() => {
                 if (!user || !window.FB) return;
                 
-                // 兼容逻辑：优先使用 Canvas 环境的 appId，如果没有则使用原本的 github-deploy 以防数据丢失
                 const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
                 const colRef = window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks');
                 
                 const unsub = window.FB.onSnapshot(colRef, 
                     (snapshot) => {
                         const fetchedTasks = [];
-                        snapshot.forEach(doc => fetchedTasks.push({ id: doc.id, ...doc.data() }));
+                        const categoryCasingMap = new Map(); // 用于修正大小写
+
+                        snapshot.forEach(doc => {
+                            let data = doc.data();
+                            
+                            // 修正历史遗留的 Need Attention 状态
+                            if (data.status === 'Need Attention') {
+                                data.status = 'In progress'; // 给一个默认底层进度
+                                data.isUrgent = true;
+                            }
+
+                            // 动态合并相同分类的大小写 (例如将 orbiva 和 Orbiva 统一成数据库中首次加载的形式)
+                            if (data.category) {
+                                const lowerCat = data.category.toLowerCase().trim();
+                                if (!categoryCasingMap.has(lowerCat)) {
+                                    categoryCasingMap.set(lowerCat, data.category.trim());
+                                }
+                                data.category = categoryCasingMap.get(lowerCat);
+                            }
+
+                            fetchedTasks.push({ id: doc.id, ...data });
+                        });
                         setTasks(fetchedTasks);
                         setLoading(false);
                     }, 
@@ -350,50 +381,84 @@
                 return () => unsub();
             }, [user]);
 
-            // 文件上传
-            const handleFileUpload = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                if (file.size > 20 * 1024 * 1024) { alert('文件过大，请上传 20MB 以内的文件'); return; }
-
-                setUploadingObj({ isUploading: true, progress: 0 });
-                const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-                const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
-                const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
-
-                uploadTask.on('state_changed', 
-                    (snapshot) => setUploadingObj({ isUploading: true, progress: Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) }), 
-                    (error) => { alert('上传失败'); setUploadingObj({ isUploading: false, progress: 0 }); }, 
-                    async () => {
-                        try {
-                            const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
-                            setEditingTask(prev => ({ ...prev, attachmentUrl: downloadURL, attachmentName: file.name }));
-                            showToast('附件上传成功！');
-                        } catch(err) {} 
-                        finally { setUploadingObj({ isUploading: false, progress: 0 }); }
-                    }
-                );
+            // 安全获取大小写统一的分类名
+            const getNormalizedCategory = (catName) => {
+                if (!catName) return "未分类";
+                const trimmed = catName.trim();
+                const lower = trimmed.toLowerCase();
+                const existing = tasks.find(t => t.category && t.category.toLowerCase() === lower);
+                return existing ? existing.category : trimmed;
             };
 
-            // 数据操作
+            // 附件文件上传 (带全局防崩溃保护)
+            const handleFileUpload = async (e) => {
+                try {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.size > 20 * 1024 * 1024) { alert('文件过大，请上传 20MB 以内的文件'); return; }
+
+                    setUploadingObj({ isUploading: true, progress: 0 });
+                    const safeName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+                    
+                    if (!window.FB || !window.FB.storage) {
+                        throw new Error("存储服务尚未初始化");
+                    }
+                    const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
+                    const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
+
+                    uploadTask.on('state_changed', 
+                        (snapshot) => {
+                            const prog = snapshot.totalBytes > 0 ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+                            setUploadingObj({ isUploading: true, progress: prog });
+                        }, 
+                        (error) => { 
+                            console.error("Upload error:", error);
+                            alert('上传失败: ' + error.message); 
+                            setUploadingObj({ isUploading: false, progress: 0 }); 
+                        }, 
+                        async () => {
+                            try {
+                                const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
+                                setEditingTask(prev => prev ? { ...prev, attachmentUrl: downloadURL, attachmentName: file.name } : null);
+                                showToast('附件上传成功！');
+                            } catch(err) {
+                                console.error("URL fetch error:", err);
+                                alert("获取链接失败");
+                            } finally { 
+                                setUploadingObj({ isUploading: false, progress: 0 }); 
+                            }
+                        }
+                    );
+                } catch (error) {
+                    console.error("File input error:", error);
+                    alert("本地读取异常，请刷新后重试。");
+                    setUploadingObj({ isUploading: false, progress: 0 });
+                } finally {
+                    e.target.value = ''; // 重置 file input 防止再次选择同文件不生效
+                }
+            };
+
             const getDocRef = (taskId) => {
                 const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
                 return window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId);
             };
 
+            // 数据保存操作
             const handleSaveTask = async (e) => {
                 e.preventDefault();
                 setSaving(true);
                 const formData = new FormData(e.target);
                 const taskId = editingTask.id || generateId();
+                
                 const taskData = {
                     id: taskId,
-                    category: formData.get('category').trim(),
+                    category: getNormalizedCategory(formData.get('category')),
                     no: formData.get('no').trim(),
                     task: formData.get('task').trim(),
                     detail: formData.get('detail').trim(),
                     progress: formData.get('progress').trim(),
-                    status: formData.get('status'),
+                    status: formData.get('status'), // 这里的 status 是不包含 Need Attention 的
+                    isUrgent: formData.get('isUrgent') === 'on', // 独立标记
                     assignee: formData.get('assignee').trim(),
                     attachmentUrl: editingTask.attachmentUrl || '', 
                     attachmentName: editingTask.attachmentName || '', 
@@ -404,7 +469,7 @@
                     await window.FB.setDoc(getDocRef(taskId), taskData);
                     showToast(editingTask.id ? '已同步更新' : '已发布任务');
                     setEditingTask(null);
-                } catch (error) { showToast("保存失败！"); } 
+                } catch (error) { showToast("保存失败，请检查网络！"); console.error(error); } 
                 finally { setSaving(false); }
             };
 
@@ -420,37 +485,62 @@
                 }
             };
 
-            const handleDrop = async (e, newStatus, newCategory = null) => {
+            // 拖拽操作 (智能判断是否仅改变紧急状态)
+            const handleDrop = async (e, targetStatus, newCategory = null) => {
                 e.preventDefault();
                 setDraggedOverCol(null);
                 const taskId = e.dataTransfer.getData('taskId');
                 if (!taskId) return;
 
+                const taskToMove = tasks.find(t => t.id === taskId);
+                if (!taskToMove) return;
+
+                let updatedFields = { updatedAt: Date.now() };
+                if (newCategory) updatedFields.category = newCategory;
+
+                if (targetStatus === 'Need Attention') {
+                    // 若拖入 Need Attention，仅添加 Urgent 标记，不改变真实的 status
+                    updatedFields.isUrgent = true;
+                } else {
+                    // 若拖入其他栏，则更新该状态，并自动解除 Urgent 标记
+                    updatedFields.status = targetStatus;
+                    updatedFields.isUrgent = false;
+                }
+
                 // 乐观更新 UI
-                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, category: newCategory || t.category, updatedAt: Date.now() } : t));
+                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedFields } : t));
                 
                 if (user && window.FB) {
                     try {
-                        await window.FB.updateDoc(getDocRef(taskId), { status: newStatus, ...(newCategory && { category: newCategory }), updatedAt: Date.now() });
+                        await window.FB.updateDoc(getDocRef(taskId), updatedFields);
                     } catch (error) { showToast("状态同步失败，将刷新页面重试"); }
                 }
             };
 
+            // CSV 读取异常保护
             const handleCsvUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    setImportText(event.target.result);
-                    showToast("文件读取成功，请检查内容并点击「解析并导入」");
-                };
-                reader.readAsText(file);
+                try {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setImportText(event.target.result);
+                        showToast("文件读取成功，请检查内容并点击「解析并导入」");
+                    };
+                    reader.onerror = () => alert("读取文件发生异常，请检查文件权限");
+                    reader.readAsText(file);
+                } catch (error) {
+                    console.error("CSV Read Error:", error);
+                    alert("加载文件发生异常！");
+                } finally {
+                    e.target.value = ''; // 重置 input
+                }
             };
 
             const handleImportSubmit = async () => {
                 if (!importText.trim()) return;
                 
-                // 标准 CSV 解析器（完美支持逗号、制表符分隔，以及处理多行文本中的引号与换行）
+                // 标准 CSV 解析器
                 const parseCSV = (text) => {
                     const rows = [];
                     let row = [];
@@ -463,14 +553,14 @@
                         
                         if (char === '"') {
                             if (inQuotes && nextChar === '"') {
-                                cell += '"'; i++; // 跳过转义的引号
+                                cell += '"'; i++; 
                             } else {
                                 inQuotes = !inQuotes;
                             }
                         } else if ((char === ',' || char === '\t') && !inQuotes) {
                             row.push(cell.trim()); cell = '';
                         } else if ((char === '\n' || char === '\r') && !inQuotes) {
-                            if (char === '\r' && nextChar === '\n') i++; // 处理 \r\n
+                            if (char === '\r' && nextChar === '\n') i++; 
                             row.push(cell.trim());
                             if (row.some(c => c !== '')) rows.push(row);
                             row = []; cell = '';
@@ -490,7 +580,6 @@
                 if (matrix.length < 2) { alert("未检测到有效数据，请确保包含表头和数据行。"); return; }
                 const headers = matrix[0];
                 
-                // 动态列头映射，精准匹配上传文件中的表头名称
                 const colMap = {
                     category: Math.max(0, headers.findIndex(h => h.includes('分类') || h.includes('板块'))),
                     no: Math.max(1, headers.findIndex(h => h.includes('序号'))),
@@ -501,6 +590,9 @@
                     assignee: Math.max(6, headers.findIndex(h => h.includes('参与人') || h.includes('负责人'))),
                 };
 
+                // 批处理时也维持一个规范映射，避免当次导入多个不同大小写的变体
+                const localCategoryMap = new Map();
+                
                 let parsedData = [], lastCat = "", lastNo = "", lastTask = "";
                 for (let i = 1; i < matrix.length; i++) {
                     const row = matrix[i];
@@ -508,8 +600,7 @@
                     
                     const getCell = (idx) => (idx === -1 || idx >= row.length) ? "" : (row[idx] || "");
                     
-                    // 继承逻辑：处理 Excel 中合并单元格导致的下发空值问题
-                    let cat = getCell(colMap.category); if (cat) lastCat = cat; else cat = lastCat;
+                    let rawCat = getCell(colMap.category); if (rawCat) lastCat = rawCat; else rawCat = lastCat;
                     let no = getCell(colMap.no); if (no) lastNo = no; else no = lastNo;
                     let task = getCell(colMap.task); if (task) lastTask = task; else task = lastTask;
                     
@@ -518,24 +609,46 @@
                     let statusRaw = getCell(colMap.status) || "To Do";
                     let assignee = getCell(colMap.assignee);
                     
-                    if (!task && !detail && !progress) continue; // 忽略完全空的数据行
+                    if (!task && !detail && !progress) continue;
 
+                    // 规范化当前处理行的 category
+                    let normalizedCat = "未分类";
+                    if (rawCat) {
+                        const lower = rawCat.toLowerCase().trim();
+                        if (!localCategoryMap.has(lower)) {
+                            // 先查看全局有没有
+                            localCategoryMap.set(lower, getNormalizedCategory(rawCat));
+                        }
+                        normalizedCat = localCategoryMap.get(lower);
+                    }
+
+                    let isUrgent = false;
                     let status = "To Do";
                     const sLower = statusRaw.toLowerCase();
-                    if (sLower.includes("attention") || sLower.includes("关注") || sLower.includes("重点")) status = "Need Attention";
-                    else if (sLower.includes("progress") || sLower.includes("进行") || sLower.includes("中")) status = "In progress";
-                    else if (sLower.includes("done") || sLower.includes("完成") || sLower.includes("已")) status = "Done";
-                    else if (sLower.includes("pending") || sLower.includes("暂缓") || sLower.includes("等待")) status = "Pending";
-                    else if (statusRaw.trim() && COLUMN_CONFIG[statusRaw]) status = statusRaw; 
+                    
+                    // 解析紧急标记及真实底层进度
+                    if (sLower.includes("attention") || sLower.includes("关注") || sLower.includes("重点")) {
+                        isUrgent = true;
+                        status = "In progress"; // 赋予默认进行中状态
+                    } else if (sLower.includes("progress") || sLower.includes("进行") || sLower.includes("中")) {
+                        status = "In progress";
+                    } else if (sLower.includes("done") || sLower.includes("完成") || sLower.includes("已")) {
+                        status = "Done";
+                    } else if (sLower.includes("pending") || sLower.includes("暂缓") || sLower.includes("等待")) {
+                        status = "Pending";
+                    } else if (statusRaw.trim() && COLUMN_CONFIG[statusRaw]) {
+                        status = statusRaw; 
+                    }
                     
                     parsedData.push({ 
                         id: `task-imp-${Date.now()}-${i}`, 
-                        category: cat || "默认板块", 
+                        category: normalizedCat, 
                         no: no, 
                         task: task || "未命名事项", 
                         detail: detail, 
                         progress: progress, 
                         status: status, 
+                        isUrgent: isUrgent,
                         assignee: assignee || "未分配", 
                         attachmentUrl: '', attachmentName: '', updatedAt: Date.now() 
                     });
@@ -543,7 +656,6 @@
 
                 setSaving(true);
                 try {
-                    // Promise.all 并发写入提升速度
                     await Promise.all(parsedData.map(t => window.FB.setDoc(getDocRef(t.id), t)));
                     showToast(`成功导入 ${parsedData.length} 条数据！`);
                     setIsImportModalOpen(false); setImportText('');
@@ -552,11 +664,11 @@
             };
 
             const handleExport = () => {
-                const headers = ['板块', '序号', '重点事项', '内部说明', '进展', '状态', '参与人', '更新时间'];
+                const headers = ['板块', '序号', '重点事项', '内部说明', '进展', '真实状态', '是否紧急(Need Attention)', '参与人', '更新时间'];
                 const rows = tasks.map(t => [
                     `"${t.category||''}"`, `"${t.no||''}"`, `"${(t.task||'').replace(/"/g, '""')}"`, 
                     `"${(t.detail||'').replace(/"/g, '""')}"`, `"${(t.progress||'').replace(/"/g, '""')}"`, 
-                    `"${t.status||''}"`, `"${t.assignee||''}"`, `"${formatDateTime(t.updatedAt)}"`
+                    `"${t.status||''}"`, `"${t.isUrgent ? 'Yes' : 'No'}"`, `"${t.assignee||''}"`, `"${formatDateTime(t.updatedAt)}"`
                 ]);
                 const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
                 const link = document.createElement("a");
@@ -590,6 +702,13 @@
                 );
             }
 
+            // 重新排列视图 Tab (看板 -> 板块概览 -> 列表)
+            const viewOptions = [
+                { id: 'kanban', label: '看板' },
+                { id: 'swimlane', label: '板块概览' },
+                { id: 'table', label: '列表' }
+            ];
+
             return (
                 <div className="flex flex-col h-screen overflow-hidden">
                     {/* 顶部导航 */}
@@ -608,16 +727,16 @@
                         
                         <div className="flex items-center space-x-3">
                             <div className="flex bg-slate-100/80 rounded-lg p-1 border border-slate-200/60 shadow-inner">
-                                {['swimlane', 'kanban', 'table'].map(v => (
-                                    <button key={v} onClick={() => setFilters(f => ({...f, view: v}))} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filters.view === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-                                        {v === 'swimlane' ? '泳道' : v === 'kanban' ? '看板' : '列表'}
+                                {viewOptions.map(v => (
+                                    <button key={v.id} onClick={() => setFilters(f => ({...f, view: v.id}))} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                                        {v.label}
                                     </button>
                                 ))}
                             </div>
                             <button onClick={() => setIsImportModalOpen(true)} className="flex items-center space-x-1 bg-white text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors shadow-sm">
                                 <Icons.Upload /> <span>导入</span>
                             </button>
-                            <button onClick={() => setEditingTask({ status: 'To Do' })} className="flex items-center space-x-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
+                            <button onClick={() => setEditingTask({ status: 'To Do', isUrgent: false })} className="flex items-center space-x-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
                                 <span className="text-lg leading-none mb-0.5">+</span> <span>新建任务</span>
                             </button>
                         </div>
@@ -659,19 +778,15 @@
                                 <h3 className="text-base font-medium text-slate-700 mb-1">开始你的第一个项目</h3>
                                 <p className="text-xs mb-4">点击右上角新建任务，或导入已有的 Excel 数据。</p>
                             </div>
-                        ) : filters.view === 'swimlane' ? (
-                            <div className="h-full overflow-y-auto pr-2 pb-10">
-                                {(filters.category === 'All' ? categories.slice(1) : [filters.category]).map(catName => {
-                                    const catTasks = filteredTasks.filter(t => t.category === catName);
-                                    if (catTasks.length === 0) return null;
-                                    return <CollapsibleSwimlane key={catName} catName={catName} columns={columns} catTasks={catTasks} draggedOverCol={draggedOverCol} onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={handleDrop} onEdit={setEditingTask} />
-                                })}
-                            </div>
                         ) : filters.view === 'kanban' ? (
+                            // 默认看板视图
                             <div className="flex h-full space-x-5 overflow-x-auto no-scrollbar pb-4 items-start">
                                 {columns.map(status => {
                                     const config = COLUMN_CONFIG[status];
-                                    const colTasks = filteredTasks.filter(t => t.status === status);
+                                    const colTasks = filteredTasks.filter(t => {
+                                        if (status === 'Need Attention') return t.isUrgent === true;
+                                        return t.status === status && !t.isUrgent;
+                                    });
                                     const isDragOver = draggedOverCol === status;
 
                                     return (
@@ -687,7 +802,17 @@
                                     );
                                 })}
                             </div>
+                        ) : filters.view === 'swimlane' ? (
+                            // 原泳道视图，已改名为 "板块概览" 且排在看板后
+                            <div className="h-full overflow-y-auto pr-2 pb-10">
+                                {(filters.category === 'All' ? categories.slice(1) : [filters.category]).map(catName => {
+                                    const catTasks = filteredTasks.filter(t => t.category === catName);
+                                    if (catTasks.length === 0) return null;
+                                    return <CollapsibleSwimlane key={catName} catName={catName} columns={columns} catTasks={catTasks} draggedOverCol={draggedOverCol} onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={handleDrop} onEdit={setEditingTask} />
+                                })}
+                            </div>
                         ) : (
+                            // 表格视图
                             <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                                 <div className="overflow-auto flex-1 relative">
                                     <table className="min-w-full divide-y divide-slate-200 text-left">
@@ -696,7 +821,7 @@
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">板块分类</th>
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-28">状态</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">状态</th>
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">参与人</th>
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32 text-right">更新时间</th>
                                             </tr>
@@ -716,6 +841,7 @@
                                                         </td>
                                                         <td className="px-5 py-3 text-xs text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
                                                         <td className="px-5 py-3 whitespace-nowrap">
+                                                            {task.isUrgent && <span className="mr-1.5 px-2 py-1 inline-flex text-[10px] font-bold rounded-md bg-red-100 text-red-700 shadow-sm border border-red-200">Need Attention</span>}
                                                             <span className={`px-2.5 py-1 inline-flex text-[10px] font-semibold rounded-md border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                                                 {config?.title.split(' ')[0] || task.status}
                                                             </span>
@@ -777,14 +903,18 @@
 
                                     <div className="grid grid-cols-2 gap-5 pb-2">
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1.5">进度状态</label>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1.5">底层进度状态</label>
                                             <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
                                                 <option value="To Do">待处理 (To Do)</option>
                                                 <option value="In progress">进行中 (In progress)</option>
-                                                <option value="Need Attention">🚨 Need Attention</option>
                                                 <option value="Pending">等待/暂停 (Pending)</option>
                                                 <option value="Done">已完成 (Done)</option>
                                             </select>
+                                            
+                                            <label className="flex items-center mt-3 cursor-pointer select-none">
+                                                <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500 cursor-pointer" disabled={saving} />
+                                                <span className="ml-2 text-xs font-bold text-red-600">🚨 标记为 Need Attention (需高优关注)</span>
+                                            </label>
                                         </div>
                                         <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
                                     </div>
