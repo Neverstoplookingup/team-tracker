@@ -55,6 +55,12 @@
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
         }
+
+        /* 甘特图相关样式 */
+        .gantt-grid {
+            background-image: linear-gradient(to right, #f1f5f9 1px, transparent 1px);
+            background-size: 40px 100%;
+        }
     </style>
 </head>
 <body>
@@ -67,7 +73,6 @@
         import { getFirestore, collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
-        // 兼容环境注入配置或使用你的专属配置
         const userConfig = {
           apiKey: "AIzaSyDyfETIW3f_mqphx7w2eErR_Z4w-EUWsZg",
           authDomain: "kanban-a8614.firebaseapp.com",
@@ -112,11 +117,11 @@
         };
 
         const COLUMN_CONFIG = {
-            'Need Attention': { title: 'Need Attention', borderColor: 'border-red-400', headerBg: 'bg-red-50', text: 'text-red-600', icon: <Icons.Alert /> },
-            'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File /> },
-            'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play /> },
-            'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause /> },
-            'Done': { title: '已完成', borderColor: 'border-emerald-400', headerBg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Icons.Check /> }
+            'Need Attention': { title: 'Need Attention', borderColor: 'border-red-400', headerBg: 'bg-red-50', text: 'text-red-600', icon: <Icons.Alert />, barColor: 'bg-red-500' },
+            'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File />, barColor: 'bg-slate-400' },
+            'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play />, barColor: 'bg-indigo-500' },
+            'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause />, barColor: 'bg-amber-400' },
+            'Done': { title: '已完成', borderColor: 'border-emerald-400', headerBg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Icons.Check />, barColor: 'bg-emerald-500' }
         };
 
         // 辅助函数
@@ -135,6 +140,11 @@
             if (!timestamp) return '-';
             const d = new Date(timestamp);
             return `${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getDate().toString().padStart(2, '0')}.${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        };
+        const parseDateOnly = (dateStr) => {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
         };
 
         // UI 组件: 头像堆叠
@@ -204,7 +214,6 @@
                         <div className="flex flex-wrap gap-1.5 pr-8">
                             {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">{task.category || '未分类'}</span>}
                             
-                            {/* 当标记为 Urgent 且在 Need Attention 栏时，显示其真实的子状态 */}
                             {task.isUrgent && (
                                 <span className="px-1.5 py-0.5 border border-red-200 bg-red-50 text-red-600 text-[10px] font-bold rounded-md flex items-center shadow-sm">
                                     🚨 {COLUMN_CONFIG[task.status]?.title.split(' ')[0] || task.status}
@@ -241,7 +250,7 @@
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100/80">
                         <AvatarGroup name={task.assignee} />
                         <div className="flex items-center space-x-2">
-                            <span className="text-[9px] text-slate-400 font-medium">{formatDateTime(task.updatedAt).split(' ')[0]}</span>
+                            {task.dueDate && <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${new Date(task.dueDate) < new Date() && task.status !== 'Done' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>{task.dueDate.substring(5).replace('-', '.')}</span>}
                             <span className="opacity-0 group-hover:opacity-100 smooth-transition text-indigo-500 bg-indigo-50 p-1 rounded"><Icons.Edit /></span>
                         </div>
                     </div>
@@ -270,7 +279,6 @@
                         <div className="flex overflow-x-auto p-4 space-x-4 min-h-[200px]">
                             {columns.map(status => {
                                 const config = COLUMN_CONFIG[status];
-                                // 分配任务逻辑与看板保持一致
                                 const colTasks = catTasks.filter(t => {
                                     if (status === 'Need Attention') return t.isUrgent === true;
                                     return t.status === status && !t.isUrgent;
@@ -309,6 +317,153 @@
             );
         };
 
+        // UI 组件: 甘特图进度规划 (Timeline View)
+        const TimelineView = ({ tasks, categories, onEdit }) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // 给所有任务分配用于展示的虚拟日期（如果没有设置）
+            const enrichedTasks = useMemo(() => {
+                return tasks.map(t => {
+                    let s = parseDateOnly(t.startDate);
+                    let e = parseDateOnly(t.dueDate);
+                    if (!s && !e) {
+                        s = new Date(today);
+                        e = new Date(today);
+                    } else if (s && !e) {
+                        e = new Date(s);
+                    } else if (!s && e) {
+                        s = new Date(e);
+                    }
+                    if (e < s) e = new Date(s);
+                    return { ...t, _start: s, _end: e };
+                });
+            }, [tasks]);
+
+            // 计算时间轴范围
+            const { minDate, maxDate, daysArray, totalDays } = useMemo(() => {
+                let minT = Math.min(...enrichedTasks.map(t => t._start.getTime()));
+                let maxT = Math.max(...enrichedTasks.map(t => t._end.getTime()));
+                
+                // 处理完全无数据的情况
+                if (!isFinite(minT)) minT = today.getTime();
+                if (!isFinite(maxT)) maxT = today.getTime();
+
+                let minD = new Date(minT);
+                let maxD = new Date(maxT);
+                
+                // 左右留出缓冲视图
+                minD.setDate(minD.getDate() - 5);
+                maxD.setDate(maxD.getDate() + 14);
+
+                // 限制最少跨度 30 天
+                const minSpan = 30 * 86400000;
+                if (maxD.getTime() - minD.getTime() < minSpan) {
+                    maxD = new Date(minD.getTime() + minSpan);
+                }
+
+                const days = [];
+                let d = new Date(minD);
+                while (d <= maxD) {
+                    days.push(new Date(d));
+                    d.setDate(d.getDate() + 1);
+                }
+
+                return { minDate: minD, maxDate: maxD, daysArray: days, totalDays: days.length };
+            }, [enrichedTasks]);
+
+            const DAY_WIDTH = 40; // 每一天的像素宽度
+            const leftColWidth = 280; // 左侧冻结列宽度
+
+            // 按分类分组渲染
+            const renderCategories = () => {
+                return (categories.filter(c => c !== 'All')).map(catName => {
+                    const catTasks = enrichedTasks.filter(t => t.category === catName);
+                    if (catTasks.length === 0) return null;
+
+                    return (
+                        <div key={catName} className="border-b border-slate-200">
+                            {/* 分类标题行 */}
+                            <div className="flex bg-slate-50/80 sticky left-0 z-10 border-r border-slate-200 font-bold text-xs text-slate-700 items-center px-4 py-2" style={{ width: leftColWidth }}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
+                                {catName}
+                            </div>
+                            
+                            {/* 任务行 */}
+                            {catTasks.map(task => {
+                                const offsetDays = (task._start.getTime() - minDate.getTime()) / 86400000;
+                                const durationDays = (task._end.getTime() - task._start.getTime()) / 86400000 + 1;
+                                
+                                const config = COLUMN_CONFIG[task.status];
+                                const barColorClass = task.isUrgent ? 'bg-red-500' : (config ? config.barColor : 'bg-slate-400');
+                                
+                                return (
+                                    <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/50 transition-colors h-11">
+                                        {/* 左侧冻结的任务信息 */}
+                                        <div className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
+                                            <div className="flex-1 min-w-0 pr-2">
+                                                <p className="text-xs font-semibold text-slate-800 truncate">{task.task}</p>
+                                                <p className="text-[10px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* 右侧进度条 */}
+                                        <div className="absolute top-0 bottom-0 right-0 pointer-events-none" style={{ left: leftColWidth }}>
+                                            <div 
+                                                className={`absolute top-2 bottom-2 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
+                                                style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${durationDays * DAY_WIDTH}px` }}
+                                                onClick={() => onEdit(task)}
+                                                title={`状态: ${task.status}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '未定'}`}
+                                            >
+                                                {durationDays > 1 && <span className="text-[9px] font-bold text-white truncate mix-blend-screen">{task.progress || '点击编辑详情'}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                });
+            };
+
+            const todayOffset = (today.getTime() - minDate.getTime()) / 86400000;
+
+            return (
+                <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
+                    <div className="flex-1 overflow-auto relative flex">
+                        <div className="min-w-max relative pb-4">
+                            {/* 表头 */}
+                            <div className="flex sticky top-0 z-20 bg-white border-b border-slate-200 h-10 shadow-sm">
+                                <div className="sticky left-0 z-30 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-xs text-slate-500 uppercase tracking-wider" style={{ width: leftColWidth }}>
+                                    板块与事项概览
+                                </div>
+                                <div className="flex relative" style={{ width: totalDays * DAY_WIDTH }}>
+                                    {daysArray.map((d, i) => {
+                                        const isToday = d.getTime() === today.getTime();
+                                        return (
+                                            <div key={i} className={`flex flex-col items-center justify-center border-r border-slate-100 text-[10px] ${isToday ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-500'}`} style={{ width: DAY_WIDTH }}>
+                                                <span>{d.getDate()}</span>
+                                                <span className="text-[8px] opacity-70">{d.getMonth() + 1}月</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            
+                            {/* 主体图表 */}
+                            <div className="relative gantt-grid" style={{ width: leftColWidth + totalDays * DAY_WIDTH }}>
+                                {/* 今天红线指示 */}
+                                {todayOffset >= 0 && todayOffset <= totalDays && (
+                                    <div className="absolute top-0 bottom-0 w-0.5 bg-red-400/80 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH + (DAY_WIDTH / 2) }}></div>
+                                )}
+                                {renderCategories()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // 主应用组件
         const App = () => {
             const [tasks, setTasks] = useState([]);
@@ -317,7 +472,7 @@
             const [saving, setSaving] = useState(false);
             const [uploadingObj, setUploadingObj] = useState({ isUploading: false, progress: 0 });
 
-            // 将 Kanban 置为默认视图
+            // 视图状态
             const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All' });
             const [draggedOverCol, setDraggedOverCol] = useState(null);
             
@@ -368,18 +523,18 @@
                 const unsub = window.FB.onSnapshot(colRef, 
                     (snapshot) => {
                         const fetchedTasks = [];
-                        const categoryCasingMap = new Map(); // 用于修正大小写
+                        const categoryCasingMap = new Map();
 
                         snapshot.forEach(doc => {
                             let data = doc.data();
                             
                             // 修正历史遗留的 Need Attention 状态
                             if (data.status === 'Need Attention') {
-                                data.status = 'In progress'; // 给一个默认底层进度
+                                data.status = 'In progress'; 
                                 data.isUrgent = true;
                             }
 
-                            // 动态合并相同分类的大小写 (例如将 orbiva 和 Orbiva 统一成数据库中首次加载的形式)
+                            // 动态合并相同分类的大小写
                             if (data.category) {
                                 const lowerCat = data.category.toLowerCase().trim();
                                 if (!categoryCasingMap.has(lowerCat)) {
@@ -402,7 +557,6 @@
                 return () => unsub();
             }, [user]);
 
-            // 安全获取大小写统一的分类名
             const getNormalizedCategory = (catName) => {
                 if (!catName) return "未分类";
                 const trimmed = catName.trim();
@@ -411,7 +565,7 @@
                 return existing ? existing.category : trimmed;
             };
 
-            // 附件文件上传 (带全局防崩溃保护)
+            // 附件文件上传
             const handleFileUpload = async (e) => {
                 const fileInput = e.target;
                 const file = fileInput.files[0];
@@ -426,15 +580,12 @@
                 setUploadingObj({ isUploading: true, progress: 0 });
 
                 try {
-                    if (!window.FB || !window.FB.storage) {
-                        throw new Error("存储服务尚未初始化");
-                    }
+                    if (!window.FB || !window.FB.storage) throw new Error("存储服务尚未初始化");
 
                     const safeName = `${Date.now()}_${encodeURIComponent(file.name)}`;
                     const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
                     const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
 
-                    // 使用 Promise 封装监听器，以便安全地 await 整个过程
                     await new Promise((resolve, reject) => {
                         uploadTask.on('state_changed', 
                             (snapshot) => {
@@ -454,7 +605,6 @@
                     alert('上传失败: ' + (error.message || '未知错误'));
                 } finally {
                     setUploadingObj({ isUploading: false, progress: 0 });
-                    // 确保在所有异步操作（读取完毕）后再清空 input
                     fileInput.value = ''; 
                 }
             };
@@ -471,15 +621,22 @@
                 const formData = new FormData(e.target);
                 const taskId = editingTask.id || generateId();
                 
+                // 处理时间字段
+                let sDate = formData.get('startDate');
+                let eDate = formData.get('dueDate');
+                if (sDate && eDate && new Date(eDate) < new Date(sDate)) eDate = sDate;
+
                 const taskData = {
                     id: taskId,
                     category: getNormalizedCategory(formData.get('category')),
                     task: formData.get('task').trim(),
                     detail: formData.get('detail').trim(),
                     progress: formData.get('progress').trim(),
-                    status: formData.get('status'), // 这里的 status 是不包含 Need Attention 的
-                    isUrgent: formData.get('isUrgent') === 'on', // 独立标记
+                    status: formData.get('status'),
+                    isUrgent: formData.get('isUrgent') === 'on',
                     assignee: formData.get('assignee').trim(),
+                    startDate: sDate || '',
+                    dueDate: eDate || '',
                     attachmentUrl: editingTask.attachmentUrl || '', 
                     attachmentName: editingTask.attachmentName || '', 
                     updatedAt: Date.now()
@@ -505,7 +662,7 @@
                 }
             };
 
-            // 拖拽操作 (智能判断是否仅改变紧急状态)
+            // 拖拽操作
             const handleDrop = async (e, targetStatus, newCategory = null) => {
                 e.preventDefault();
                 setDraggedOverCol(null);
@@ -519,25 +676,21 @@
                 if (newCategory) updatedFields.category = newCategory;
 
                 if (targetStatus === 'Need Attention') {
-                    // 若拖入 Need Attention，仅添加 Urgent 标记，不改变真实的 status
                     updatedFields.isUrgent = true;
                 } else {
-                    // 若拖入其他栏，则更新该状态，并自动解除 Urgent 标记
                     updatedFields.status = targetStatus;
                     updatedFields.isUrgent = false;
                 }
 
-                // 乐观更新 UI
                 setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedFields } : t));
                 
                 if (user && window.FB) {
-                    try {
-                        await window.FB.updateDoc(getDocRef(taskId), updatedFields);
-                    } catch (error) { showToast("状态同步失败，将刷新页面重试"); }
+                    try { await window.FB.updateDoc(getDocRef(taskId), updatedFields); } 
+                    catch (error) { showToast("状态同步失败，将刷新页面重试"); }
                 }
             };
 
-            // CSV 读取异常保护（修复引发页面崩溃的根源）
+            // CSV 批量操作
             const handleCsvUpload = (e) => {
                 const fileInput = e.target;
                 const file = fileInput.files[0];
@@ -548,76 +701,51 @@
                     reader.onload = (event) => {
                         setImportText(event.target.result);
                         showToast("文件读取成功，请检查内容并点击「解析并导入」");
-                        fileInput.value = ''; // 读取成功后再清空
+                        fileInput.value = '';
                     };
-                    reader.onerror = () => {
-                        alert("读取文件发生异常，请检查文件权限");
-                        fileInput.value = ''; // 发生错误时清空
-                    };
+                    reader.onerror = () => { alert("读取异常"); fileInput.value = ''; };
                     reader.readAsText(file);
                 } catch (error) {
-                    console.error("CSV Read Error:", error);
-                    alert("加载文件发生异常！");
-                    fileInput.value = ''; // 捕获异常后清空
+                    alert("加载文件发生异常！"); fileInput.value = '';
                 }
             };
 
             const handleImportSubmit = async () => {
                 if (!importText.trim()) return;
                 
-                // 标准 CSV 解析器
                 const parseCSV = (text) => {
-                    const rows = [];
-                    let row = [];
-                    let cell = '';
-                    let inQuotes = false;
-                    
+                    const rows = []; let row = []; let cell = ''; let inQuotes = false;
                     for (let i = 0; i < text.length; i++) {
-                        const char = text[i];
-                        const nextChar = text[i + 1];
-                        
+                        const char = text[i]; const nextChar = text[i + 1];
                         if (char === '"') {
-                            if (inQuotes && nextChar === '"') {
-                                cell += '"'; i++; 
-                            } else {
-                                inQuotes = !inQuotes;
-                            }
-                        } else if ((char === ',' || char === '\t') && !inQuotes) {
-                            row.push(cell.trim()); cell = '';
+                            if (inQuotes && nextChar === '"') { cell += '"'; i++; } else { inQuotes = !inQuotes; }
+                        } else if ((char === ',' || char === '\t') && !inQuotes) { row.push(cell.trim()); cell = '';
                         } else if ((char === '\n' || char === '\r') && !inQuotes) {
                             if (char === '\r' && nextChar === '\n') i++; 
-                            row.push(cell.trim());
-                            if (row.some(c => c !== '')) rows.push(row);
+                            row.push(cell.trim()); if (row.some(c => c !== '')) rows.push(row);
                             row = []; cell = '';
-                        } else {
-                            cell += char;
-                        }
+                        } else { cell += char; }
                     }
-                    if (cell || row.length > 0) {
-                        row.push(cell.trim());
-                        if (row.some(c => c !== '')) rows.push(row);
-                    }
+                    if (cell || row.length > 0) { row.push(cell.trim()); if (row.some(c => c !== '')) rows.push(row); }
                     return rows;
                 };
 
                 const matrix = parseCSV(importText);
-
-                if (matrix.length < 2) { alert("未检测到有效数据，请确保包含表头和数据行。"); return; }
+                if (matrix.length < 2) { alert("未检测到有效数据"); return; }
                 const headers = matrix[0];
                 
                 const colMap = {
                     category: Math.max(0, headers.findIndex(h => h.includes('分类') || h.includes('板块'))),
                     task: Math.max(1, headers.findIndex(h => h.includes('事项') || h.includes('项目'))),
-                    detail: Math.max(2, headers.findIndex(h => h.includes('具体') || h.includes('详细') || h.includes('备注') || h.includes('操作'))),
+                    detail: Math.max(2, headers.findIndex(h => h.includes('具体') || h.includes('详细') || h.includes('备注'))),
                     progress: Math.max(3, headers.findIndex(h => h.includes('进展') || h.includes('预期'))),
                     status: Math.max(4, headers.findIndex(h => h.includes('状态'))),
                     assignee: Math.max(5, headers.findIndex(h => h.includes('参与人') || h.includes('负责人'))),
                 };
 
-                // 批处理时也维持一个规范映射，避免当次导入多个不同大小写的变体
                 const localCategoryMap = new Map();
-                
                 let parsedData = [], lastCat = "", lastTask = "";
+                
                 for (let i = 1; i < matrix.length; i++) {
                     const row = matrix[i];
                     if (row.length === 0 || row.every(c => !c)) continue;
@@ -627,52 +755,29 @@
                     let rawCat = getCell(colMap.category); if (rawCat) lastCat = rawCat; else rawCat = lastCat;
                     let task = getCell(colMap.task); if (task) lastTask = task; else task = lastTask;
                     
-                    let detail = getCell(colMap.detail);
-                    let progress = getCell(colMap.progress);
-                    let statusRaw = getCell(colMap.status) || "To Do";
-                    let assignee = getCell(colMap.assignee);
-                    
+                    let detail = getCell(colMap.detail), progress = getCell(colMap.progress);
+                    let statusRaw = getCell(colMap.status) || "To Do", assignee = getCell(colMap.assignee);
                     if (!task && !detail && !progress) continue;
 
-                    // 规范化当前处理行的 category
                     let normalizedCat = "未分类";
                     if (rawCat) {
                         const lower = rawCat.toLowerCase().trim();
-                        if (!localCategoryMap.has(lower)) {
-                            // 先查看全局有没有
-                            localCategoryMap.set(lower, getNormalizedCategory(rawCat));
-                        }
+                        if (!localCategoryMap.has(lower)) localCategoryMap.set(lower, getNormalizedCategory(rawCat));
                         normalizedCat = localCategoryMap.get(lower);
                     }
 
-                    let isUrgent = false;
-                    let status = "To Do";
+                    let isUrgent = false, status = "To Do";
                     const sLower = statusRaw.toLowerCase();
-                    
-                    // 解析紧急标记及真实底层进度
-                    if (sLower.includes("attention") || sLower.includes("关注") || sLower.includes("重点")) {
-                        isUrgent = true;
-                        status = "In progress"; // 赋予默认进行中状态
-                    } else if (sLower.includes("progress") || sLower.includes("进行") || sLower.includes("中")) {
-                        status = "In progress";
-                    } else if (sLower.includes("done") || sLower.includes("完成") || sLower.includes("已")) {
-                        status = "Done";
-                    } else if (sLower.includes("pending") || sLower.includes("暂缓") || sLower.includes("等待")) {
-                        status = "Pending";
-                    } else if (statusRaw.trim() && COLUMN_CONFIG[statusRaw]) {
-                        status = statusRaw; 
-                    }
+                    if (sLower.includes("attention") || sLower.includes("重点")) { isUrgent = true; status = "In progress"; } 
+                    else if (sLower.includes("progress") || sLower.includes("进行")) { status = "In progress"; } 
+                    else if (sLower.includes("done") || sLower.includes("完成")) { status = "Done"; } 
+                    else if (sLower.includes("pending") || sLower.includes("暂缓")) { status = "Pending"; } 
+                    else if (statusRaw.trim() && COLUMN_CONFIG[statusRaw]) { status = statusRaw; }
                     
                     parsedData.push({ 
-                        id: `task-imp-${Date.now()}-${i}`, 
-                        category: normalizedCat, 
-                        task: task || "未命名事项", 
-                        detail: detail, 
-                        progress: progress, 
-                        status: status, 
-                        isUrgent: isUrgent,
-                        assignee: assignee || "未分配", 
-                        attachmentUrl: '', attachmentName: '', updatedAt: Date.now() 
+                        id: `task-imp-${Date.now()}-${i}`, category: normalizedCat, 
+                        task: task || "未命名事项", detail, progress, status, isUrgent, assignee: assignee || "未分配", 
+                        startDate: '', dueDate: '', attachmentUrl: '', attachmentName: '', updatedAt: Date.now() 
                     });
                 }
 
@@ -681,16 +786,17 @@
                     await Promise.all(parsedData.map(t => window.FB.setDoc(getDocRef(t.id), t)));
                     showToast(`成功导入 ${parsedData.length} 条数据！`);
                     setIsImportModalOpen(false); setImportText('');
-                } catch (error) { alert("批量同步失败，请检查网络"); console.error(error); }
+                } catch (error) { alert("批量同步失败"); }
                 finally { setSaving(false); }
             };
 
             const handleExport = () => {
-                const headers = ['板块', '重点事项', '内部说明', '进展', '真实状态', '是否紧急(Need Attention)', '参与人', '更新时间'];
+                const headers = ['板块', '重点事项', '内部说明', '进展', '真实状态', '是否紧急(Need Attention)', '参与人', '开始日期', '截止日期', '更新时间'];
                 const rows = tasks.map(t => [
                     `"${t.category||''}"`, `"${(t.task||'').replace(/"/g, '""')}"`, 
                     `"${(t.detail||'').replace(/"/g, '""')}"`, `"${(t.progress||'').replace(/"/g, '""')}"`, 
-                    `"${t.status||''}"`, `"${t.isUrgent ? 'Yes' : 'No'}"`, `"${t.assignee||''}"`, `"${formatDateTime(t.updatedAt)}"`
+                    `"${t.status||''}"`, `"${t.isUrgent ? 'Yes' : 'No'}"`, `"${t.assignee||''}"`, 
+                    `"${t.startDate||''}"`, `"${t.dueDate||''}"`, `"${formatDateTime(t.updatedAt)}"`
                 ]);
                 const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
                 const link = document.createElement("a");
@@ -724,11 +830,12 @@
                 );
             }
 
-            // 重新排列视图 Tab (看板 -> 板块概览 -> 列表)
+            // 视图选项增加进度规划
             const viewOptions = [
-                { id: 'kanban', label: '看板' },
+                { id: 'kanban', label: '看板视图' },
+                { id: 'timeline', label: '进度规划(甘特图)' },
                 { id: 'swimlane', label: '板块概览' },
-                { id: 'table', label: '列表' }
+                { id: 'table', label: '列表清单' }
             ];
 
             return (
@@ -798,7 +905,6 @@
                                 <p className="text-xs mb-4">点击右上角新建任务，或导入已有的 Excel 数据。</p>
                             </div>
                         ) : filters.view === 'kanban' ? (
-                            // 默认看板视图
                             <div className="flex h-full space-x-5 overflow-x-auto no-scrollbar pb-4 items-start">
                                 {columns.map(status => {
                                     const config = COLUMN_CONFIG[status];
@@ -829,8 +935,10 @@
                                     );
                                 })}
                             </div>
+                        ) : filters.view === 'timeline' ? (
+                            // 新增的甘特图视图
+                            <TimelineView tasks={filteredTasks} categories={categories} onEdit={setEditingTask} />
                         ) : filters.view === 'swimlane' ? (
-                            // 板块概览
                             <div className="h-full overflow-y-auto pr-2 pb-10">
                                 {(filters.category === 'All' ? categories.slice(1) : [filters.category]).map(catName => {
                                     const catTasks = filteredTasks.filter(t => t.category === catName);
@@ -839,7 +947,6 @@
                                 })}
                             </div>
                         ) : (
-                            // 表格视图
                             <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                                 <div className="overflow-auto flex-1 relative">
                                     <table className="min-w-full divide-y divide-slate-200 text-left">
@@ -849,8 +956,8 @@
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
                                                 <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">状态</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">参与人</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32 text-right">更新时间</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">周期</th>
+                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">参与人</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
@@ -872,8 +979,10 @@
                                                                 {config?.title.split(' ')[0] || task.status}
                                                             </span>
                                                         </td>
+                                                        <td className="px-5 py-3 text-[10px] text-slate-500 whitespace-nowrap">
+                                                            {task.startDate || '-'} <br/> {task.dueDate || '-'}
+                                                        </td>
                                                         <td className="px-5 py-3 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
-                                                        <td className="px-5 py-3 whitespace-nowrap text-right text-[10px] text-slate-400 font-mono">{formatDateTime(task.updatedAt)}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -904,6 +1013,11 @@
                                     
                                     <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     
+                                    <div className="grid grid-cols-2 gap-5">
+                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                    </div>
+
                                     {/* 附件模块 */}
                                     <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60">
                                         <label className="flex items-center text-xs font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1">附件与相关链接</span></label>
