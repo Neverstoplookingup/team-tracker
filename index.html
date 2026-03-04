@@ -171,14 +171,14 @@
             const [isOpen, setIsOpen] = useState(true);
             return (
                 <div className="mb-3 bg-white/60 rounded-xl shadow-sm border border-slate-200/60 overflow-hidden">
-                    <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-3 py-2 hover:bg-white transition-colors border-b border-slate-100/50">
-                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                    <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white transition-colors border-b border-slate-100/50">
+                        <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
                             {category}
                         </span>
                         <div className="flex items-center space-x-2">
-                            <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold">{tasks.length}</span>
-                            <svg className={`w-3 h-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                            <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">{tasks.length}</span>
+                            <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                         </div>
                     </button>
                     <div className={`transition-all duration-300 overflow-hidden ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
@@ -212,35 +212,35 @@
                 >
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex flex-wrap gap-1.5 pr-8">
-                            {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">{task.category || '未分类'}</span>}
+                            {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[11px] font-medium rounded-md">{task.category || '未分类'}</span>}
                             
                             {task.isUrgent && (
-                                <span className="px-1.5 py-0.5 border border-red-200 bg-red-50 text-red-600 text-[10px] font-bold rounded-md flex items-center shadow-sm">
+                                <span className="px-1.5 py-0.5 border border-red-200 bg-red-50 text-red-600 text-[11px] font-bold rounded-md flex items-center shadow-sm">
                                     🚨 {COLUMN_CONFIG[task.status]?.title.split(' ')[0] || task.status}
                                 </span>
                             )}
                         </div>
                     </div>
                     
-                    <h4 className="font-semibold text-slate-800 text-[13px] mb-2 leading-relaxed group-hover:text-indigo-600 transition-colors">
+                    <h4 className="font-semibold text-slate-800 text-sm mb-2 leading-relaxed group-hover:text-indigo-600 transition-colors">
                         {task.task || '未命名事项'}
                     </h4>
                     
                     {task.detail && (
                         <div className="mb-2">
-                            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/80 p-1.5 rounded-md border border-slate-100">{task.detail}</p>
+                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/80 p-1.5 rounded-md border border-slate-100">{task.detail}</p>
                         </div>
                     )}
                     
                     {task.progress && (
                         <div className="mb-3 flex-1">
-                            <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed whitespace-pre-wrap">{task.progress}</p>
+                            <p className="text-[13px] text-slate-600 line-clamp-3 leading-relaxed whitespace-pre-wrap">{task.progress}</p>
                         </div>
                     )}
 
                     {task.attachmentUrl && (
                         <div className="mt-auto mb-3">
-                            <button onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }} className="max-w-full flex items-center space-x-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-md text-[11px] text-slate-600 hover:text-indigo-600 transition-colors shadow-sm w-fit" title={task.attachmentName || '查看附件'}>
+                            <button onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }} className="max-w-full flex items-center space-x-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-md text-xs text-slate-600 hover:text-indigo-600 transition-colors shadow-sm w-fit" title={task.attachmentName || '查看附件'}>
                                 <Icons.Link />
                                 <span className="truncate max-w-[140px] font-medium">{task.attachmentName || '附件链接'}</span>
                             </button>
@@ -250,7 +250,7 @@
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100/80">
                         <AvatarGroup name={task.assignee} />
                         <div className="flex items-center space-x-2">
-                            {task.dueDate && <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${new Date(task.dueDate) < new Date() && task.status !== 'Done' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>{task.dueDate.substring(5).replace('-', '.')}</span>}
+                            {task.dueDate && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${new Date(task.dueDate) < new Date() && task.status !== 'Done' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>{task.dueDate.substring(5).replace('-', '.')}</span>}
                             <span className="opacity-0 group-hover:opacity-100 smooth-transition text-indigo-500 bg-indigo-50 p-1 rounded"><Icons.Edit /></span>
                         </div>
                     </div>
@@ -264,14 +264,14 @@
 
             return (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col mb-5 smooth-transition">
-                    <button onClick={() => setIsOpen(!isOpen)} className="bg-slate-50 hover:bg-slate-100 transition-colors px-4 py-3 flex justify-between items-center w-full border-b border-slate-200">
+                    <button onClick={() => setIsOpen(!isOpen)} className="bg-slate-50 hover:bg-slate-100 transition-colors px-4 py-3.5 flex justify-between items-center w-full border-b border-slate-200">
                         <div className="flex items-center space-x-3">
                             <svg className={`w-4 h-4 text-slate-400 smooth-transition ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                            <h2 className="font-bold text-slate-700 text-[13px] tracking-wide flex items-center gap-2">
+                            <h2 className="font-bold text-slate-700 text-sm tracking-wide flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
                                 {catName}
                             </h2>
-                            <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{catTasks.length} 项</span>
+                            <span className="text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{catTasks.length} 项</span>
                         </div>
                     </button>
                     
@@ -295,11 +295,11 @@
                                         className={`flex-shrink-0 w-[290px] flex flex-col rounded-xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
                                     >
                                         <div className={`px-3 py-2.5 flex justify-between items-center border-b border-slate-100/50 ${config.headerBg}`}>
-                                            <h3 className={`font-semibold text-xs flex items-center space-x-1.5 ${config.text}`}>
+                                            <h3 className={`font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}`}>
                                                 {config.icon}
                                                 <span>{config.title}</span>
                                             </h3>
-                                            <span className={`text-[10px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
+                                            <span className={`text-[11px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
                                         </div>
                                         <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto max-h-[500px] no-scrollbar">
                                             {colTasks.length === 0 ? (
@@ -352,12 +352,12 @@
                 let minD = new Date(minT);
                 let maxD = new Date(maxT);
                 
-                // 左右留出缓冲视图
-                minD.setDate(minD.getDate() - 5);
-                maxD.setDate(maxD.getDate() + 14);
+                // 左右留出缓冲视图 (缩减空白，使任务焦点更集中)
+                minD.setDate(minD.getDate() - 3);
+                maxD.setDate(maxD.getDate() + 7);
 
-                // 限制最少跨度 30 天
-                const minSpan = 30 * 86400000;
+                // 限制最少跨度 (缩短至 14 天)
+                const minSpan = 14 * 86400000;
                 if (maxD.getTime() - minD.getTime() < minSpan) {
                     maxD = new Date(minD.getTime() + minSpan);
                 }
@@ -372,8 +372,8 @@
                 return { minDate: minD, maxDate: maxD, daysArray: days, totalDays: days.length };
             }, [enrichedTasks]);
 
-            const DAY_WIDTH = 40; // 每一天的像素宽度
-            const leftColWidth = 280; // 左侧冻结列宽度
+            const DAY_WIDTH = 64; // 增加每天的像素宽度，放大甘特图区间
+            const leftColWidth = 300; // 左侧冻结列宽度增加以适应大字体
 
             // 按分类分组渲染
             const renderCategories = () => {
@@ -384,7 +384,7 @@
                     return (
                         <div key={catName} className="border-b border-slate-200">
                             {/* 分类标题行 */}
-                            <div className="flex bg-slate-50/80 sticky left-0 z-10 border-r border-slate-200 font-bold text-xs text-slate-700 items-center px-4 py-2" style={{ width: leftColWidth }}>
+                            <div className="flex bg-slate-50/80 sticky left-0 z-10 border-r border-slate-200 font-bold text-[13px] text-slate-700 items-center px-4 py-2.5" style={{ width: leftColWidth }}>
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
                                 {catName}
                             </div>
@@ -398,24 +398,24 @@
                                 const barColorClass = task.isUrgent ? 'bg-red-500' : (config ? config.barColor : 'bg-slate-400');
                                 
                                 return (
-                                    <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/50 transition-colors h-11">
+                                    <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/50 transition-colors h-12">
                                         {/* 左侧冻结的任务信息 */}
                                         <div className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                                             <div className="flex-1 min-w-0 pr-2">
-                                                <p className="text-xs font-semibold text-slate-800 truncate">{task.task}</p>
-                                                <p className="text-[10px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
+                                                <p className="text-[13px] font-semibold text-slate-800 truncate">{task.task}</p>
+                                                <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
                                             </div>
                                         </div>
                                         
                                         {/* 右侧进度条 */}
                                         <div className="absolute top-0 bottom-0 right-0 pointer-events-none" style={{ left: leftColWidth }}>
                                             <div 
-                                                className={`absolute top-2 bottom-2 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
+                                                className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2.5 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
                                                 style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${durationDays * DAY_WIDTH}px` }}
                                                 onClick={() => onEdit(task)}
                                                 title={`状态: ${task.status}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '未定'}`}
                                             >
-                                                {durationDays > 1 && <span className="text-[9px] font-bold text-white truncate mix-blend-screen">{task.progress || '点击编辑详情'}</span>}
+                                                {durationDays > 0.8 && <span className="text-[11px] font-bold text-white truncate mix-blend-screen">{task.progress || '点击编辑详情'}</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -433,17 +433,17 @@
                     <div className="flex-1 overflow-auto relative flex">
                         <div className="min-w-max relative pb-4">
                             {/* 表头 */}
-                            <div className="flex sticky top-0 z-20 bg-white border-b border-slate-200 h-10 shadow-sm">
-                                <div className="sticky left-0 z-30 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-xs text-slate-500 uppercase tracking-wider" style={{ width: leftColWidth }}>
+                            <div className="flex sticky top-0 z-20 bg-white border-b border-slate-200 h-12 shadow-sm">
+                                <div className="sticky left-0 z-30 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-[13px] text-slate-500 uppercase tracking-wider" style={{ width: leftColWidth }}>
                                     板块与事项概览
                                 </div>
                                 <div className="flex relative" style={{ width: totalDays * DAY_WIDTH }}>
                                     {daysArray.map((d, i) => {
                                         const isToday = d.getTime() === today.getTime();
                                         return (
-                                            <div key={i} className={`flex flex-col items-center justify-center border-r border-slate-100 text-[10px] ${isToday ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-500'}`} style={{ width: DAY_WIDTH }}>
+                                            <div key={i} className={`flex flex-col items-center justify-center border-r border-slate-100 text-xs ${isToday ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-500'}`} style={{ width: DAY_WIDTH }}>
                                                 <span>{d.getDate()}</span>
-                                                <span className="text-[8px] opacity-70">{d.getMonth() + 1}月</span>
+                                                <span className="text-[10px] opacity-70">{d.getMonth() + 1}月</span>
                                             </div>
                                         );
                                     })}
@@ -841,46 +841,46 @@
             return (
                 <div className="flex flex-col h-screen overflow-hidden">
                     {/* 顶部导航 */}
-                    <header className="glass-header border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shrink-0 z-20">
+                    <header className="glass-header border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 z-20">
                         <div className="flex items-center space-x-3">
-                            <div className="w-9 h-9 bg-indigo-600 rounded-lg shadow-sm flex items-center justify-center font-bold text-white tracking-wider">HC</div>
+                            <div className="w-10 h-10 bg-indigo-600 rounded-lg shadow-sm flex items-center justify-center font-bold text-white tracking-wider text-sm">HC</div>
                             <div>
-                                <h1 className="text-[15px] font-bold text-slate-800 flex items-center">
+                                <h1 className="text-base font-bold text-slate-800 flex items-center">
                                     协同工作台
                                 </h1>
                             </div>
                         </div>
                         
                         <div className="flex items-center space-x-3">
-                            <div className="flex bg-slate-100/80 rounded-lg p-1 border border-slate-200/60 shadow-inner">
+                            <div className="flex bg-slate-100/80 rounded-lg p-1.5 border border-slate-200/60 shadow-inner">
                                 {viewOptions.map(v => (
-                                    <button key={v.id} onClick={() => setFilters(f => ({...f, view: v.id}))} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                                    <button key={v.id} onClick={() => setFilters(f => ({...f, view: v.id}))} className={`px-4 py-1.5 text-[13px] font-medium rounded-md transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                                         {v.label}
                                     </button>
                                 ))}
                             </div>
-                            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center space-x-1 bg-white text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors shadow-sm">
+                            <button onClick={() => setIsImportModalOpen(true)} className="flex items-center space-x-1.5 bg-white text-slate-600 border border-slate-300 px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-slate-50 transition-colors shadow-sm">
                                 <Icons.Upload /> <span>导入</span>
                             </button>
-                            <button onClick={() => setEditingTask({ status: 'To Do', isUrgent: false })} className="flex items-center space-x-1 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
+                            <button onClick={() => setEditingTask({ status: 'To Do', isUrgent: false })} className="flex items-center space-x-1.5 bg-indigo-600 text-white px-5 py-2 rounded-lg text-[13px] font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
                                 <span className="text-lg leading-none mb-0.5">+</span> <span>新建任务</span>
                             </button>
                         </div>
                     </header>
 
                     {/* 控制栏 */}
-                    <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-2 flex items-center justify-between shrink-0 z-10">
+                    <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 z-10">
                         <div className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-1">
                             <div className="flex items-center space-x-2 border-r border-slate-200 pr-5">
-                                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">执行人</span>
-                                <select className="text-xs bg-slate-50 border border-slate-200 rounded-md py-1 px-2 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
+                                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">执行人</span>
+                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
                                     {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部人员' : a}</option>)}
                                 </select>
                             </div>
                             <div className="flex items-center space-x-1.5">
-                                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mr-1">分类</span>
+                                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider mr-2">分类</span>
                                 {categories.map(cat => (
-                                    <button key={cat} onClick={() => setFilters(f => ({...f, category: cat}))} className={`px-3 py-1 rounded-full text-[11px] font-medium transition-colors border ${filters.category === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                                    <button key={cat} onClick={() => setFilters(f => ({...f, category: cat}))} className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors border ${filters.category === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
                                         {cat === 'All' ? '全部' : cat}
                                     </button>
                                 ))}
@@ -890,7 +890,7 @@
                         <div className="flex items-center space-x-3 pl-4 border-l border-slate-200">
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400"><Icons.Search /></span>
-                                <input type="text" placeholder="搜索事项或人员..." className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48 transition-all focus:w-56 focus:bg-white" value={filters.search} onChange={(e) => setFilters(f => ({...f, search: e.target.value}))} />
+                                <input type="text" placeholder="搜索事项或人员..." className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500 w-52 transition-all focus:w-64 focus:bg-white" value={filters.search} onChange={(e) => setFilters(f => ({...f, search: e.target.value}))} />
                             </div>
                             <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-md hover:bg-slate-100 transition-colors" title="导出备份"><Icons.Download /></button>
                         </div>
@@ -952,12 +952,12 @@
                                     <table className="min-w-full divide-y divide-slate-200 text-left">
                                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                             <tr>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">板块分类</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-32">状态</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">周期</th>
-                                                <th className="px-5 py-3.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-24">参与人</th>
+                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">板块分类</th>
+                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
+                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
+                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">状态</th>
+                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">周期</th>
+                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">参与人</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
@@ -965,24 +965,24 @@
                                                 const config = COLUMN_CONFIG[task.status];
                                                 return (
                                                     <tr key={task.id} onClick={() => setEditingTask(task)} className="hover:bg-slate-50/80 transition-colors cursor-pointer group">
-                                                        <td className="px-5 py-3 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-xs font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
-                                                        <td className="px-5 py-3 text-xs text-slate-800 font-medium">
-                                                            <div className="flex items-center gap-2 mb-1">
+                                                        <td className="px-5 py-3.5 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-[13px] font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
+                                                        <td className="px-5 py-3.5 text-[13px] text-slate-800 font-medium">
+                                                            <div className="flex items-center gap-2 mb-1.5">
                                                                 <span>{task.task}</span>
                                                             </div>
-                                                            {task.detail && <div className="text-[10px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
+                                                            {task.detail && <div className="text-[11px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
                                                         </td>
-                                                        <td className="px-5 py-3 text-xs text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
-                                                        <td className="px-5 py-3 whitespace-nowrap">
-                                                            {task.isUrgent && <span className="mr-1.5 px-2 py-1 inline-flex text-[10px] font-bold rounded-md bg-red-100 text-red-700 shadow-sm border border-red-200">Need Attention</span>}
-                                                            <span className={`px-2.5 py-1 inline-flex text-[10px] font-semibold rounded-md border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                                                        <td className="px-5 py-3.5 text-[13px] text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
+                                                        <td className="px-5 py-3.5 whitespace-nowrap">
+                                                            {task.isUrgent && <span className="mr-1.5 px-2 py-1 inline-flex text-[11px] font-bold rounded-md bg-red-100 text-red-700 shadow-sm border border-red-200">Need Attention</span>}
+                                                            <span className={`px-2.5 py-1 inline-flex text-[11px] font-semibold rounded-md border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                                                 {config?.title.split(' ')[0] || task.status}
                                                             </span>
                                                         </td>
-                                                        <td className="px-5 py-3 text-[10px] text-slate-500 whitespace-nowrap">
+                                                        <td className="px-5 py-3.5 text-[11px] text-slate-500 whitespace-nowrap">
                                                             {task.startDate || '-'} <br/> {task.dueDate || '-'}
                                                         </td>
-                                                        <td className="px-5 py-3 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
+                                                        <td className="px-5 py-3.5 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
                                                     </tr>
                                                 );
                                             })}
@@ -998,73 +998,73 @@
                         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
                             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content border border-slate-200/50">
                                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-                                    <h2 className="text-lg font-bold text-slate-800 flex items-center">
+                                    <h2 className="text-xl font-bold text-slate-800 flex items-center">
                                         {editingTask.id ? '编辑任务' : '新建任务'}
-                                        {saving && <span className="ml-3 text-xs text-indigo-500 font-normal flex items-center"><span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping mr-2"></span>同步中...</span>}
+                                        {saving && <span className="ml-3 text-[13px] text-indigo-500 font-normal flex items-center"><span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping mr-2"></span>同步中...</span>}
                                     </h2>
-                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving || uploadingObj.isUploading}><Icons.Alert style={{display:'none'}}/><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving || uploadingObj.isUploading}><Icons.Alert style={{display:'none'}}/><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 
-                                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-5">
+                                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-6">
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">板块分类</label>
-                                        <input name="category" defaultValue={editingTask.category} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="例如：顶层设计" disabled={saving} />
+                                        <label className="block text-[13px] font-semibold text-slate-600 mb-2">板块分类</label>
+                                        <input name="category" defaultValue={editingTask.category} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="例如：顶层设计" disabled={saving} />
                                     </div>
                                     
-                                    <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                    <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     
                                     <div className="grid grid-cols-2 gap-5">
-                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
-                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                        <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                        <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     </div>
 
                                     {/* 附件模块 */}
                                     <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60">
-                                        <label className="flex items-center text-xs font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1">附件与相关链接</span></label>
-                                        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-                                            <label className={`px-4 py-2 border rounded-lg text-xs font-medium transition-colors whitespace-nowrap shadow-sm flex items-center justify-center ${uploadingObj.isUploading ? 'bg-indigo-50 text-indigo-400 border-indigo-100 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 cursor-pointer'}`}>
+                                        <label className="flex items-center text-[13px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">附件与相关链接</span></label>
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
+                                            <label className={`px-4 py-2.5 border rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap shadow-sm flex items-center justify-center ${uploadingObj.isUploading ? 'bg-indigo-50 text-indigo-400 border-indigo-100 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 cursor-pointer'}`}>
                                                 <Icons.Upload /> <span className="ml-1.5">{uploadingObj.isUploading ? `上传中 ${uploadingObj.progress}%` : '上传本地文件'}</span>
                                                 <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploadingObj.isUploading || saving} />
                                             </label>
                                             <div className="flex-1 w-full">
-                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
+                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
                                             </div>
                                         </div>
                                         {editingTask.attachmentName && (
-                                            <div className="mt-3 flex items-center inline-flex bg-white px-2.5 py-1.5 rounded-md border border-slate-200 shadow-sm">
-                                                <Icons.File /> <span className="ml-1.5 text-xs text-slate-600 font-medium max-w-[200px] truncate">{editingTask.attachmentName}</span>
-                                                <button type="button" onClick={() => setEditingTask({...editingTask, attachmentName: '', attachmentUrl: ''})} className="ml-3 text-slate-400 hover:text-red-500"><Icons.Edit style={{display:'none'}}/><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                            <div className="mt-4 flex items-center inline-flex bg-white px-3 py-2 rounded-md border border-slate-200 shadow-sm">
+                                                <Icons.File /> <span className="ml-2 text-[13px] text-slate-600 font-medium max-w-[200px] truncate">{editingTask.attachmentName}</span>
+                                                <button type="button" onClick={() => setEditingTask({...editingTask, attachmentName: '', attachmentUrl: ''})} className="ml-3 text-slate-400 hover:text-red-500"><Icons.Edit style={{display:'none'}}/><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                             </div>
                                         )}
                                     </div>
 
-                                    <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">最新进展</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
-                                    <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
+                                    <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
+                                    <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
 
                                     <div className="grid grid-cols-2 gap-5 pb-2">
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1.5">底层进度状态</label>
-                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
+                                            <label className="block text-[13px] font-semibold text-slate-600 mb-2">底层进度状态</label>
+                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
                                                 <option value="To Do">待处理 (To Do)</option>
                                                 <option value="In progress">进行中 (In progress)</option>
                                                 <option value="Pending">等待/暂停 (Pending)</option>
                                                 <option value="Done">已完成 (Done)</option>
                                             </select>
                                             
-                                            <label className="flex items-center mt-3 cursor-pointer select-none">
+                                            <label className="flex items-center mt-4 cursor-pointer select-none">
                                                 <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500 cursor-pointer" disabled={saving} />
-                                                <span className="ml-2 text-xs font-bold text-red-600">🚨 标记为 Need Attention (需高优关注)</span>
+                                                <span className="ml-2 text-[13px] font-bold text-red-600">🚨 标记为 Need Attention (需高优关注)</span>
                                             </label>
                                         </div>
-                                        <div><label className="block text-xs font-semibold text-slate-600 mb-1.5">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
+                                        <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
                                     </div>
                                 </form>
                                 
                                 <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
-                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-slate-400 hover:text-red-500 text-xs font-medium transition-colors">删除任务</button> : <div></div>}
+                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-slate-400 hover:text-red-500 text-[13px] font-medium transition-colors">删除任务</button> : <div></div>}
                                     <div className="flex space-x-3">
-                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-5 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
-                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-6 py-2 text-xs font-bold text-white rounded-lg transition-all shadow-sm ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5'}`}>
+                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-5 py-2 text-[13px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
+                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-6 py-2 text-[13px] font-bold text-white rounded-lg transition-all shadow-sm ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5'}`}>
                                             {saving ? '保存中...' : (uploadingObj.isUploading ? '处理文件中' : '确认保存')}
                                         </button>
                                     </div>
