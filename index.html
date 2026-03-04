@@ -65,7 +65,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        // 增加了 uploadBytes 以支持非流式超时上传
+        import { getStorage, ref, uploadBytesResumable, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         const userConfig = {
           apiKey: "AIzaSyDyfETIW3f_mqphx7w2eErR_Z4w-EUWsZg",
@@ -87,7 +88,7 @@
         window.FB = { 
             auth, db, storage, doc, setDoc, deleteDoc, updateDoc, onSnapshot, collection, 
             signInAnonymously, signInWithCustomToken, onAuthStateChanged, 
-            ref, uploadBytesResumable, getDownloadURL 
+            ref, uploadBytesResumable, uploadBytes, getDownloadURL 
         };
         window.dispatchEvent(new Event('firebase-loaded'));
     </script>
@@ -263,7 +264,7 @@
             );
         };
 
-        // UI 组件: 可折叠板块内项目概览 (原泳道)
+        // UI 组件: 可折叠板块内项目概览
         const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
             const [isOpen, setIsOpen] = useState(true);
 
@@ -322,11 +323,10 @@
             );
         };
 
-        // UI 组件: 各板块进度条 (Timeline/Gantt View - 按月显示，更加紧凑)
+        // UI 组件: 各板块进度条 (Timeline/Gantt View)
         const TimelineView = ({ tasks, categories, onEdit }) => {
             const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
-            // 智能处理“至今”逻辑：空截止日期视为跨度到今天
             const enrichedTasks = useMemo(() => {
                 return tasks.map(t => {
                     let s = parseDateOnly(t.startDate);
@@ -334,7 +334,7 @@
                     if (!s && !e) {
                         s = new Date(today); e = new Date(today);
                     } else if (s && !e) {
-                        e = new Date(today); // 无截止日期，视为“至今”
+                        e = new Date(today); 
                     } else if (!s && e) {
                         s = new Date(e);
                     }
@@ -343,7 +343,6 @@
                 });
             }, [tasks, today]);
 
-            // 按照月进行时间段划分缩放
             const { minDate, maxDate, monthsArray, totalDays } = useMemo(() => {
                 let minT = Math.min(...enrichedTasks.map(t => t._start.getTime()));
                 let maxT = Math.max(...enrichedTasks.map(t => t._end.getTime()));
@@ -354,16 +353,15 @@
                 let minD = new Date(minT);
                 let maxD = new Date(maxT);
                 
-                // 左右留出适量缓冲空间 (往前推1个月，往后推2个月)
                 minD = new Date(minD.getFullYear(), minD.getMonth() - 1, 1);
-                maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0); // 月末最后一天
+                maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0); 
 
                 const mArray = [];
                 let curr = new Date(minD);
                 while (curr <= maxD) {
                     const y = curr.getFullYear();
                     const m = curr.getMonth();
-                    const days = new Date(y, m + 1, 0).getDate(); // 获取该月总天数
+                    const days = new Date(y, m + 1, 0).getDate(); 
                     mArray.push({ year: y, month: m, daysInMonth: days, date: new Date(curr) });
                     curr.setMonth(m + 1);
                 }
@@ -372,8 +370,7 @@
                 return { minDate: minD, maxDate: maxD, monthsArray: mArray, totalDays: tDays };
             }, [enrichedTasks, today]);
 
-            // 核心缩放参数：缩小每一天所占像素，利用月份作为网格底纹
-            const DAY_WIDTH = 4; // 这样1个月大约120像素宽，非常紧凑美观
+            const DAY_WIDTH = 4; 
             const leftColWidth = 320; 
 
             const renderCategories = () => {
@@ -383,26 +380,21 @@
 
                     return (
                         <div key={catName} className="border-b border-slate-200 relative z-10">
-                            {/* 分类标题行 */}
                             <div className="flex bg-slate-50/90 sticky left-0 z-20 border-r border-slate-200 font-bold text-[13px] text-slate-700 items-center px-4 py-2.5 shadow-sm" style={{ width: leftColWidth }}>
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
                                 {catName}
                             </div>
                             
-                            {/* 任务行 */}
                             {catTasks.map(task => {
                                 const offsetDays = (task._start.getTime() - minDate.getTime()) / 86400000;
                                 const durationDays = (task._end.getTime() - task._start.getTime()) / 86400000 + 1;
                                 
                                 const config = COLUMN_CONFIG[task.status];
                                 const barColorClass = task.isUrgent ? 'bg-red-500' : (config ? config.barColor : 'bg-slate-400');
-                                
-                                // 保证进度条至少有一点可见宽度
                                 const barWidth = Math.max(durationDays * DAY_WIDTH, 12);
 
                                 return (
                                     <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/70 transition-colors h-12">
-                                        {/* 左侧冻结的任务信息 */}
                                         <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <p className="text-[13px] font-semibold text-slate-800 truncate">{task.task}</p>
@@ -410,7 +402,6 @@
                                             </div>
                                         </div>
                                         
-                                        {/* 右侧进度轨道 */}
                                         <div className="absolute top-0 bottom-0 right-0 pointer-events-none" style={{ left: leftColWidth }}>
                                             <div 
                                                 className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
@@ -435,7 +426,6 @@
                 <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
                     <div className="flex-1 overflow-auto relative flex">
                         <div className="min-w-max relative pb-4">
-                            {/* 顶部月份表头 */}
                             <div className="flex sticky top-0 z-30 bg-white border-b border-slate-200 h-10 shadow-sm">
                                 <div className="sticky left-0 z-40 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-[13px] text-slate-600 uppercase tracking-wider" style={{ width: leftColWidth }}>
                                     板块与事项标题
@@ -449,16 +439,13 @@
                                 </div>
                             </div>
                             
-                            {/* 主体图表与网格 */}
                             <div className="relative" style={{ width: leftColWidth + totalDays * DAY_WIDTH, minHeight: '100%' }}>
-                                {/* 月份竖向分割线 */}
                                 <div className="absolute top-0 bottom-0 flex pointer-events-none z-0" style={{ left: leftColWidth }}>
                                     {monthsArray.map((m, i) => (
                                         <div key={i} className="border-r border-slate-100 h-full box-border" style={{ width: m.daysInMonth * DAY_WIDTH }}></div>
                                     ))}
                                 </div>
                                 
-                                {/* 今天红线指示 */}
                                 {todayOffset >= 0 && todayOffset <= totalDays && (
                                     <div className="absolute top-0 bottom-0 w-[2px] bg-red-400/70 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH }}></div>
                                 )}
@@ -479,7 +466,7 @@
             const [saving, setSaving] = useState(false);
             const [uploadingObj, setUploadingObj] = useState({ isUploading: false, progress: 0 });
 
-            // 视图状态与所有筛选器（包含全局状态筛选）
+            // 视图状态与所有筛选器
             const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
             const [draggedOverCol, setDraggedOverCol] = useState(null);
             
@@ -570,7 +557,7 @@
                 return existing ? existing.category : trimmed;
             };
 
-            // 附件文件上传
+            // 附件文件上传 (带防假死强制超时)
             const handleFileUpload = async (e) => {
                 const fileInput = e.target;
                 const file = fileInput.files[0];
@@ -589,25 +576,25 @@
 
                     const safeName = `${Date.now()}_${encodeURIComponent(file.name)}`;
                     const storageRef = window.FB.ref(window.FB.storage, `kanban_attachments/${safeName}`);
-                    const uploadTask = window.FB.uploadBytesResumable(storageRef, file);
+                    
+                    // 使用原生 uploadBytes 并加入 15秒超时控制，防止 Firebase 死锁
+                    const uploadPromise = window.FB.uploadBytes(storageRef, file);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("TIMEOUT")), 15000)
+                    );
 
-                    await new Promise((resolve, reject) => {
-                        uploadTask.on('state_changed', 
-                            (snapshot) => {
-                                const prog = snapshot.totalBytes > 0 ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
-                                setUploadingObj({ isUploading: true, progress: prog });
-                            }, 
-                            (error) => reject(error),
-                            () => resolve()
-                        );
-                    });
+                    await Promise.race([uploadPromise, timeoutPromise]);
 
-                    const downloadURL = await window.FB.getDownloadURL(uploadTask.snapshot.ref);
+                    const downloadURL = await window.FB.getDownloadURL(storageRef);
                     setEditingTask(prev => prev ? { ...prev, attachmentUrl: downloadURL, attachmentName: file.name } : null);
                     showToast('附件上传成功！');
                 } catch (error) {
                     console.error("Upload error:", error);
-                    alert('上传失败: ' + (error.message || '未知错误'));
+                    if (error.message === 'TIMEOUT') {
+                        alert('上传超时！这通常是因为 Storage 没有开启权限或跨域 (CORS) 限制导致。');
+                    } else {
+                        alert('上传失败: ' + (error.message || '未知错误'));
+                    }
                 } finally {
                     setUploadingObj({ isUploading: false, progress: 0 });
                     fileInput.value = ''; 
@@ -626,7 +613,6 @@
                 const formData = new FormData(e.target);
                 const taskId = editingTask.id || generateId();
                 
-                // 处理时间字段
                 let sDate = formData.get('startDate');
                 let eDate = formData.get('dueDate');
                 if (sDate && eDate && new Date(eDate) < new Date(sDate)) eDate = sDate;
@@ -667,7 +653,6 @@
                 }
             };
 
-            // 拖拽操作
             const handleDrop = async (e, targetStatus, newCategory = null) => {
                 e.preventDefault();
                 setDraggedOverCol(null);
@@ -695,7 +680,6 @@
                 }
             };
 
-            // CSV 批量操作
             const handleCsvUpload = (e) => {
                 const fileInput = e.target;
                 const file = fileInput.files[0];
@@ -810,7 +794,7 @@
                 link.click();
             };
 
-            // 过滤与计算 (加入了状态过滤)
+            // 过滤与计算
             const filteredTasks = useMemo(() => {
                 return [...tasks]
                     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
@@ -826,8 +810,6 @@
             const categories = ['All', ...new Set(tasks.map(t => t.category).filter(Boolean).sort())];
             const assignees = ['All', ...new Set(tasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))];
             const columns = Object.keys(COLUMN_CONFIG);
-            
-            // 下拉栏所需的所有状态
             const statusOptions = ['All', ...columns];
 
             if (loading) {
@@ -839,7 +821,6 @@
                 );
             }
 
-            // 精调视图顺序并重命名
             const viewOptions = [
                 { id: 'kanban', label: '看板视图' },
                 { id: 'swimlane', label: '板块内项目概览' },
@@ -877,28 +858,26 @@
                         </div>
                     </header>
 
-                    {/* 控制栏 (增加全局状态筛选) */}
+                    {/* 控制栏 (全下拉菜单) */}
                     <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 z-10">
                         <div className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-1">
                             <div className="flex items-center space-x-2 pr-5 border-r border-slate-200">
                                 <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider">执行人</span>
-                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
+                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer max-w-[120px] truncate" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
                                     {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部人员' : a}</option>)}
                                 </select>
                             </div>
                             <div className="flex items-center space-x-2 pr-5 border-r border-slate-200">
                                 <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider">状态过滤</span>
-                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.status} onChange={(e) => setFilters(f => ({...f, status: e.target.value}))}>
+                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer max-w-[140px] truncate" value={filters.status} onChange={(e) => setFilters(f => ({...f, status: e.target.value}))}>
                                     {statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部状态' : (COLUMN_CONFIG[s]?.title || s)}</option>)}
                                 </select>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider mr-2">板块分类</span>
-                                {categories.map(cat => (
-                                    <button key={cat} onClick={() => setFilters(f => ({...f, category: cat}))} className={`px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors border ${filters.category === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
-                                        {cat === 'All' ? '全部' : cat}
-                                    </button>
-                                ))}
+                                <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider">板块分类</span>
+                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer max-w-[160px] truncate" value={filters.category} onChange={(e) => setFilters(f => ({...f, category: e.target.value}))}>
+                                    {categories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? '全部板块' : cat}</option>)}
+                                </select>
                             </div>
                         </div>
 
@@ -973,7 +952,6 @@
                                                             className="ml-2 px-1.5 py-1 bg-white border border-slate-200 rounded text-[11px] normal-case tracking-normal text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm max-w-[85px] truncate"
                                                             value={filters.category}
                                                             onChange={(e) => setFilters(f => ({...f, category: e.target.value}))}
-                                                            onClick={(e) => e.stopPropagation()}
                                                         >
                                                             {categories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? '全部板块' : cat}</option>)}
                                                         </select>
@@ -990,7 +968,6 @@
                                                             className="ml-2 px-1.5 py-1 bg-white border border-slate-200 rounded text-[11px] normal-case tracking-normal text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm max-w-[80px] truncate"
                                                             value={filters.assignee}
                                                             onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}
-                                                            onClick={(e) => e.stopPropagation()}
                                                         >
                                                             {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部人员' : a}</option>)}
                                                         </select>
