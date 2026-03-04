@@ -55,12 +55,6 @@
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
         }
-
-        /* 甘特图相关样式 */
-        .gantt-grid {
-            background-image: linear-gradient(to right, #f1f5f9 1px, transparent 1px);
-            background-size: 40px 100%;
-        }
     </style>
 </head>
 <body>
@@ -250,7 +244,13 @@
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100/80">
                         <AvatarGroup name={task.assignee} />
                         <div className="flex items-center space-x-2">
-                            {task.dueDate && <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${new Date(task.dueDate) < new Date() && task.status !== 'Done' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>{task.dueDate.substring(5).replace('-', '.')}</span>}
+                            { (task.startDate || task.dueDate) && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${(!task.dueDate || new Date(task.dueDate) < new Date()) && task.status !== 'Done' ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>
+                                    {task.startDate ? task.startDate.substring(5).replace('-', '.') : '未定'} 
+                                    {' 至 '} 
+                                    {task.dueDate ? task.dueDate.substring(5).replace('-', '.') : '至今'}
+                                </span>
+                            )}
                             <span className="opacity-0 group-hover:opacity-100 smooth-transition text-indigo-500 bg-indigo-50 p-1 rounded"><Icons.Edit /></span>
                         </div>
                     </div>
@@ -258,7 +258,7 @@
             );
         };
 
-        // UI 组件: 可折叠板块概览 (原泳道)
+        // UI 组件: 可折叠板块内项目概览 (原泳道)
         const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
             const [isOpen, setIsOpen] = useState(true);
 
@@ -317,74 +317,69 @@
             );
         };
 
-        // UI 组件: 甘特图进度规划 (Timeline View)
+        // UI 组件: 各板块进度条 (Timeline/Gantt View - 按月显示，更加紧凑)
         const TimelineView = ({ tasks, categories, onEdit }) => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
+            const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
-            // 给所有任务分配用于展示的虚拟日期（如果没有设置）
+            // 智能处理“至今”逻辑：空截止日期视为跨度到今天
             const enrichedTasks = useMemo(() => {
                 return tasks.map(t => {
                     let s = parseDateOnly(t.startDate);
                     let e = parseDateOnly(t.dueDate);
                     if (!s && !e) {
-                        s = new Date(today);
-                        e = new Date(today);
+                        s = new Date(today); e = new Date(today);
                     } else if (s && !e) {
-                        e = new Date(s);
+                        e = new Date(today); // 无截止日期，视为“至今”
                     } else if (!s && e) {
                         s = new Date(e);
                     }
                     if (e < s) e = new Date(s);
                     return { ...t, _start: s, _end: e };
                 });
-            }, [tasks]);
+            }, [tasks, today]);
 
-            // 计算时间轴范围
-            const { minDate, maxDate, daysArray, totalDays } = useMemo(() => {
+            // 按照月进行时间段划分缩放
+            const { minDate, maxDate, monthsArray, totalDays } = useMemo(() => {
                 let minT = Math.min(...enrichedTasks.map(t => t._start.getTime()));
                 let maxT = Math.max(...enrichedTasks.map(t => t._end.getTime()));
                 
-                // 处理完全无数据的情况
                 if (!isFinite(minT)) minT = today.getTime();
                 if (!isFinite(maxT)) maxT = today.getTime();
 
                 let minD = new Date(minT);
                 let maxD = new Date(maxT);
                 
-                // 左右留出缓冲视图 (缩减空白，使任务焦点更集中)
-                minD.setDate(minD.getDate() - 3);
-                maxD.setDate(maxD.getDate() + 7);
+                // 左右留出适量缓冲空间 (往前推1个月，往后推2个月)
+                minD = new Date(minD.getFullYear(), minD.getMonth() - 1, 1);
+                maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0); // 月末最后一天
 
-                // 限制最少跨度 (缩短至 14 天)
-                const minSpan = 14 * 86400000;
-                if (maxD.getTime() - minD.getTime() < minSpan) {
-                    maxD = new Date(minD.getTime() + minSpan);
+                const mArray = [];
+                let curr = new Date(minD);
+                while (curr <= maxD) {
+                    const y = curr.getFullYear();
+                    const m = curr.getMonth();
+                    const days = new Date(y, m + 1, 0).getDate(); // 获取该月总天数
+                    mArray.push({ year: y, month: m, daysInMonth: days, date: new Date(curr) });
+                    curr.setMonth(m + 1);
                 }
+                
+                const tDays = mArray.reduce((acc, val) => acc + val.daysInMonth, 0);
+                return { minDate: minD, maxDate: maxD, monthsArray: mArray, totalDays: tDays };
+            }, [enrichedTasks, today]);
 
-                const days = [];
-                let d = new Date(minD);
-                while (d <= maxD) {
-                    days.push(new Date(d));
-                    d.setDate(d.getDate() + 1);
-                }
+            // 核心缩放参数：缩小每一天所占像素，利用月份作为网格底纹
+            const DAY_WIDTH = 4; // 这样1个月大约120像素宽，非常紧凑美观
+            const leftColWidth = 320; 
 
-                return { minDate: minD, maxDate: maxD, daysArray: days, totalDays: days.length };
-            }, [enrichedTasks]);
-
-            const DAY_WIDTH = 64; // 增加每天的像素宽度，放大甘特图区间
-            const leftColWidth = 300; // 左侧冻结列宽度增加以适应大字体
-
-            // 按分类分组渲染
             const renderCategories = () => {
                 return (categories.filter(c => c !== 'All')).map(catName => {
                     const catTasks = enrichedTasks.filter(t => t.category === catName);
                     if (catTasks.length === 0) return null;
 
                     return (
-                        <div key={catName} className="border-b border-slate-200">
+                        <div key={catName} className="border-b border-slate-200 relative z-10">
                             {/* 分类标题行 */}
-                            <div className="flex bg-slate-50/80 sticky left-0 z-10 border-r border-slate-200 font-bold text-[13px] text-slate-700 items-center px-4 py-2.5" style={{ width: leftColWidth }}>
+                            <div className="flex bg-slate-50/90 sticky left-0 z-20 border-r border-slate-200 font-bold text-[13px] text-slate-700 items-center px-4 py-2.5 shadow-sm" style={{ width: leftColWidth }}>
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>
                                 {catName}
                             </div>
@@ -397,25 +392,28 @@
                                 const config = COLUMN_CONFIG[task.status];
                                 const barColorClass = task.isUrgent ? 'bg-red-500' : (config ? config.barColor : 'bg-slate-400');
                                 
+                                // 保证进度条至少有一点可见宽度
+                                const barWidth = Math.max(durationDays * DAY_WIDTH, 12);
+
                                 return (
-                                    <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/50 transition-colors h-12">
+                                    <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/70 transition-colors h-12">
                                         {/* 左侧冻结的任务信息 */}
-                                        <div className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
+                                        <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <p className="text-[13px] font-semibold text-slate-800 truncate">{task.task}</p>
                                                 <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
                                             </div>
                                         </div>
                                         
-                                        {/* 右侧进度条 */}
+                                        {/* 右侧进度轨道 */}
                                         <div className="absolute top-0 bottom-0 right-0 pointer-events-none" style={{ left: leftColWidth }}>
                                             <div 
-                                                className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2.5 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
-                                                style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${durationDays * DAY_WIDTH}px` }}
+                                                className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
+                                                style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${barWidth}px` }}
                                                 onClick={() => onEdit(task)}
-                                                title={`状态: ${task.status}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '未定'}`}
+                                                title={`状态: ${task.status}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '至今'}`}
                                             >
-                                                {durationDays > 0.8 && <span className="text-[11px] font-bold text-white truncate mix-blend-screen">{task.progress || '点击编辑详情'}</span>}
+                                                {barWidth > 40 && <span className="text-[11px] font-bold text-white truncate mix-blend-screen pl-1">{task.progress || '查看详情'}</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -432,30 +430,34 @@
                 <div className="h-full bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
                     <div className="flex-1 overflow-auto relative flex">
                         <div className="min-w-max relative pb-4">
-                            {/* 表头 */}
-                            <div className="flex sticky top-0 z-20 bg-white border-b border-slate-200 h-12 shadow-sm">
-                                <div className="sticky left-0 z-30 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-[13px] text-slate-500 uppercase tracking-wider" style={{ width: leftColWidth }}>
-                                    板块与事项概览
+                            {/* 顶部月份表头 */}
+                            <div className="flex sticky top-0 z-30 bg-white border-b border-slate-200 h-10 shadow-sm">
+                                <div className="sticky left-0 z-40 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-[13px] text-slate-600 uppercase tracking-wider" style={{ width: leftColWidth }}>
+                                    板块与事项标题
                                 </div>
                                 <div className="flex relative" style={{ width: totalDays * DAY_WIDTH }}>
-                                    {daysArray.map((d, i) => {
-                                        const isToday = d.getTime() === today.getTime();
-                                        return (
-                                            <div key={i} className={`flex flex-col items-center justify-center border-r border-slate-100 text-xs ${isToday ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-500'}`} style={{ width: DAY_WIDTH }}>
-                                                <span>{d.getDate()}</span>
-                                                <span className="text-[10px] opacity-70">{d.getMonth() + 1}月</span>
-                                            </div>
-                                        );
-                                    })}
+                                    {monthsArray.map((m, i) => (
+                                        <div key={i} className="flex flex-col items-center justify-center border-r border-slate-200 text-[11px] text-slate-500 font-bold bg-slate-50/50" style={{ width: m.daysInMonth * DAY_WIDTH }}>
+                                            {m.year}年{m.month + 1}月
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                             
-                            {/* 主体图表 */}
-                            <div className="relative gantt-grid" style={{ width: leftColWidth + totalDays * DAY_WIDTH }}>
+                            {/* 主体图表与网格 */}
+                            <div className="relative" style={{ width: leftColWidth + totalDays * DAY_WIDTH, minHeight: '100%' }}>
+                                {/* 月份竖向分割线 */}
+                                <div className="absolute top-0 bottom-0 flex pointer-events-none z-0" style={{ left: leftColWidth }}>
+                                    {monthsArray.map((m, i) => (
+                                        <div key={i} className="border-r border-slate-100 h-full box-border" style={{ width: m.daysInMonth * DAY_WIDTH }}></div>
+                                    ))}
+                                </div>
+                                
                                 {/* 今天红线指示 */}
                                 {todayOffset >= 0 && todayOffset <= totalDays && (
-                                    <div className="absolute top-0 bottom-0 w-0.5 bg-red-400/80 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH + (DAY_WIDTH / 2) }}></div>
+                                    <div className="absolute top-0 bottom-0 w-[2px] bg-red-400/70 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH }}></div>
                                 )}
+                                
                                 {renderCategories()}
                             </div>
                         </div>
@@ -472,8 +474,8 @@
             const [saving, setSaving] = useState(false);
             const [uploadingObj, setUploadingObj] = useState({ isUploading: false, progress: 0 });
 
-            // 视图状态
-            const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All' });
+            // 视图状态与所有筛选器（包含全局状态筛选）
+            const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
             const [draggedOverCol, setDraggedOverCol] = useState(null);
             
             const [editingTask, setEditingTask] = useState(null);
@@ -528,13 +530,11 @@
                         snapshot.forEach(doc => {
                             let data = doc.data();
                             
-                            // 修正历史遗留的 Need Attention 状态
                             if (data.status === 'Need Attention') {
                                 data.status = 'In progress'; 
                                 data.isUrgent = true;
                             }
 
-                            // 动态合并相同分类的大小写
                             if (data.category) {
                                 const lowerCat = data.category.toLowerCase().trim();
                                 if (!categoryCasingMap.has(lowerCat)) {
@@ -791,7 +791,7 @@
             };
 
             const handleExport = () => {
-                const headers = ['板块', '重点事项', '内部说明', '进展', '真实状态', '是否紧急(Need Attention)', '参与人', '开始日期', '截止日期', '更新时间'];
+                const headers = ['板块', '事项标题', '内部说明', '进展', '真实状态', '是否紧急(Need Attention)', '参与人', '开始日期', '截止日期', '最后编辑时间'];
                 const rows = tasks.map(t => [
                     `"${t.category||''}"`, `"${(t.task||'').replace(/"/g, '""')}"`, 
                     `"${(t.detail||'').replace(/"/g, '""')}"`, `"${(t.progress||'').replace(/"/g, '""')}"`, 
@@ -805,7 +805,7 @@
                 link.click();
             };
 
-            // 过滤与计算
+            // 过滤与计算 (加入了状态过滤)
             const filteredTasks = useMemo(() => {
                 return [...tasks]
                     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
@@ -813,13 +813,17 @@
                         const matchSearch = `${t.task} ${t.detail} ${t.progress} ${t.assignee}`.toLowerCase().includes(filters.search.toLowerCase());
                         const matchCat = filters.category === 'All' || t.category === filters.category;
                         const matchAssignee = filters.assignee === 'All' || (t.assignee && t.assignee.includes(filters.assignee));
-                        return matchSearch && matchCat && matchAssignee;
+                        const matchStatus = filters.status === 'All' || t.status === filters.status || (filters.status === 'Need Attention' && t.isUrgent);
+                        return matchSearch && matchCat && matchAssignee && matchStatus;
                     });
             }, [tasks, filters]);
 
             const categories = ['All', ...new Set(tasks.map(t => t.category).filter(Boolean).sort())];
             const assignees = ['All', ...new Set(tasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))];
             const columns = Object.keys(COLUMN_CONFIG);
+            
+            // 下拉栏所需的所有状态
+            const statusOptions = ['All', ...columns];
 
             if (loading) {
                 return (
@@ -830,11 +834,11 @@
                 );
             }
 
-            // 视图选项增加进度规划
+            // 精调视图顺序并重命名
             const viewOptions = [
                 { id: 'kanban', label: '看板视图' },
-                { id: 'timeline', label: '进度规划(甘特图)' },
-                { id: 'swimlane', label: '板块概览' },
+                { id: 'swimlane', label: '板块内项目概览' },
+                { id: 'timeline', label: '各板块进度条' },
                 { id: 'table', label: '列表清单' }
             ];
 
@@ -845,7 +849,7 @@
                         <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-indigo-600 rounded-lg shadow-sm flex items-center justify-center font-bold text-white tracking-wider text-sm">HC</div>
                             <div>
-                                <h1 className="text-base font-bold text-slate-800 flex items-center">
+                                <h1 className="text-[17px] font-bold text-slate-800 flex items-center">
                                     协同工作台
                                 </h1>
                             </div>
@@ -868,19 +872,25 @@
                         </div>
                     </header>
 
-                    {/* 控制栏 */}
+                    {/* 控制栏 (增加全局状态筛选) */}
                     <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 z-10">
                         <div className="flex items-center space-x-5 overflow-x-auto no-scrollbar py-1">
-                            <div className="flex items-center space-x-2 border-r border-slate-200 pr-5">
-                                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">执行人</span>
+                            <div className="flex items-center space-x-2 pr-5 border-r border-slate-200">
+                                <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider">执行人</span>
                                 <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
                                     {assignees.map(a => <option key={a} value={a}>{a === 'All' ? '全部人员' : a}</option>)}
                                 </select>
                             </div>
-                            <div className="flex items-center space-x-1.5">
-                                <span className="text-xs font-medium text-slate-400 uppercase tracking-wider mr-2">分类</span>
+                            <div className="flex items-center space-x-2 pr-5 border-r border-slate-200">
+                                <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider">状态过滤</span>
+                                <select className="text-[13px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-3 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" value={filters.status} onChange={(e) => setFilters(f => ({...f, status: e.target.value}))}>
+                                    {statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部状态' : (COLUMN_CONFIG[s]?.title || s)}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <span className="text-[13px] font-medium text-slate-400 uppercase tracking-wider mr-2">板块分类</span>
                                 {categories.map(cat => (
-                                    <button key={cat} onClick={() => setFilters(f => ({...f, category: cat}))} className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors border ${filters.category === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
+                                    <button key={cat} onClick={() => setFilters(f => ({...f, category: cat}))} className={`px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors border ${filters.category === cat ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
                                         {cat === 'All' ? '全部' : cat}
                                     </button>
                                 ))}
@@ -890,9 +900,9 @@
                         <div className="flex items-center space-x-3 pl-4 border-l border-slate-200">
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400"><Icons.Search /></span>
-                                <input type="text" placeholder="搜索事项或人员..." className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500 w-52 transition-all focus:w-64 focus:bg-white" value={filters.search} onChange={(e) => setFilters(f => ({...f, search: e.target.value}))} />
+                                <input type="text" placeholder="搜索事项或人员..." className="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500 w-52 transition-all focus:w-64 focus:bg-white" value={filters.search} onChange={(e) => setFilters(f => ({...f, search: e.target.value}))} />
                             </div>
-                            <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-1.5 rounded-md hover:bg-slate-100 transition-colors" title="导出备份"><Icons.Download /></button>
+                            <button onClick={handleExport} className="text-slate-400 hover:text-indigo-600 p-2 rounded-md hover:bg-slate-100 transition-colors" title="导出备份"><Icons.Download /></button>
                         </div>
                     </div>
 
@@ -902,7 +912,7 @@
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
                                 <div className="text-4xl mb-4 opacity-50">✨</div>
                                 <h3 className="text-base font-medium text-slate-700 mb-1">开始你的第一个项目</h3>
-                                <p className="text-xs mb-4">点击右上角新建任务，或导入已有的 Excel 数据。</p>
+                                <p className="text-sm mb-4">点击右上角新建任务，或导入已有的 Excel 数据。</p>
                             </div>
                         ) : filters.view === 'kanban' ? (
                             <div className="flex h-full space-x-5 overflow-x-auto no-scrollbar pb-4 items-start">
@@ -915,14 +925,14 @@
                                     const isDragOver = draggedOverCol === status;
 
                                     return (
-                                        <div key={status} onDragOver={(e) => { e.preventDefault(); setDraggedOverCol(status); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={(e) => handleDrop(e, status)} className={`flex-shrink-0 w-[300px] max-h-full flex flex-col rounded-2xl bg-white shadow-sm transition-all duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}>
+                                        <div key={status} onDragOver={(e) => { e.preventDefault(); setDraggedOverCol(status); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={(e) => handleDrop(e, status)} className={`flex-shrink-0 w-[310px] max-h-full flex flex-col rounded-2xl bg-white shadow-sm transition-all duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}>
                                             <div className={`px-4 py-3 flex justify-between items-center border-b border-slate-100/60 rounded-t-xl ${config.headerBg}`}>
-                                                <h3 className={`font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}`}>{config.icon}<span>{config.title}</span></h3>
-                                                <span className={`text-[10px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
+                                                <h3 className={`font-semibold text-[14px] flex items-center space-x-1.5 ${config.text}`}>{config.icon}<span>{config.title}</span></h3>
+                                                <span className={`text-[11px] font-bold ${config.text} bg-white px-2.5 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
                                             </div>
-                                            <div className="p-2 flex-1 overflow-y-auto no-scrollbar bg-slate-50/40 rounded-b-xl">
+                                            <div className="p-3 flex-1 overflow-y-auto no-scrollbar bg-slate-50/40 rounded-b-xl">
                                                 {colTasks.length === 0 ? (
-                                                    <div className="h-24 m-1 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-300 text-xs">拖拽至此</div>
+                                                    <div className="h-24 m-1 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-300 text-sm">拖拽至此</div>
                                                 ) : (
                                                     categories.filter(c => c !== 'All').map(cat => {
                                                         const catTasks = colTasks.filter(t => t.category === cat);
@@ -936,7 +946,6 @@
                                 })}
                             </div>
                         ) : filters.view === 'timeline' ? (
-                            // 新增的甘特图视图
                             <TimelineView tasks={filteredTasks} categories={categories} onEdit={setEditingTask} />
                         ) : filters.view === 'swimlane' ? (
                             <div className="h-full overflow-y-auto pr-2 pb-10">
@@ -952,12 +961,13 @@
                                     <table className="min-w-full divide-y divide-slate-200 text-left">
                                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                                             <tr>
-                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">板块分类</th>
-                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-1/4">重点事项</th>
-                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
-                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">状态</th>
-                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">周期</th>
-                                                <th className="px-5 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">参与人</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-40">板块分类</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-1/4">事项标题</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider">进展动态</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-36">状态</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-32">周期</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-32">参与人</th>
+                                                <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-40 text-right">最后编辑时间</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
@@ -965,24 +975,30 @@
                                                 const config = COLUMN_CONFIG[task.status];
                                                 return (
                                                     <tr key={task.id} onClick={() => setEditingTask(task)} className="hover:bg-slate-50/80 transition-colors cursor-pointer group">
-                                                        <td className="px-5 py-3.5 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-[13px] font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
-                                                        <td className="px-5 py-3.5 text-[13px] text-slate-800 font-medium">
+                                                        <td className="px-6 py-4 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-[13px] font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
+                                                        <td className="px-6 py-4 text-[13px] text-slate-800 font-medium">
                                                             <div className="flex items-center gap-2 mb-1.5">
                                                                 <span>{task.task}</span>
                                                             </div>
                                                             {task.detail && <div className="text-[11px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
                                                         </td>
-                                                        <td className="px-5 py-3.5 text-[13px] text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
-                                                        <td className="px-5 py-3.5 whitespace-nowrap">
+                                                        <td className="px-6 py-4 text-[13px] text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
                                                             {task.isUrgent && <span className="mr-1.5 px-2 py-1 inline-flex text-[11px] font-bold rounded-md bg-red-100 text-red-700 shadow-sm border border-red-200">Need Attention</span>}
                                                             <span className={`px-2.5 py-1 inline-flex text-[11px] font-semibold rounded-md border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                                                                 {config?.title.split(' ')[0] || task.status}
                                                             </span>
                                                         </td>
-                                                        <td className="px-5 py-3.5 text-[11px] text-slate-500 whitespace-nowrap">
-                                                            {task.startDate || '-'} <br/> {task.dueDate || '-'}
+                                                        <td className="px-6 py-4 text-[11px] text-slate-500 whitespace-nowrap leading-relaxed">
+                                                            {task.startDate || task.dueDate ? (
+                                                                <>
+                                                                    {task.startDate || '未定'} <br/> 
+                                                                    <span className={!task.dueDate ? "text-indigo-500 font-bold" : ""}>至 {task.dueDate || '至今'}</span>
+                                                                </>
+                                                            ) : '-'}
                                                         </td>
-                                                        <td className="px-5 py-3.5 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-[11px] text-slate-400 font-mono">{formatDateTime(task.updatedAt)}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -1007,27 +1023,27 @@
                                 
                                 <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto p-6 space-y-6">
                                     <div>
-                                        <label className="block text-[13px] font-semibold text-slate-600 mb-2">板块分类</label>
-                                        <input name="category" defaultValue={editingTask.category} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="例如：顶层设计" disabled={saving} />
+                                        <label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label>
+                                        <input name="category" defaultValue={editingTask.category} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="例如：顶层设计" disabled={saving} />
                                     </div>
                                     
-                                    <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">重点事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">事项标题 <span className="text-red-500">*</span></label><input required name="task" defaultValue={editingTask.task} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     
                                     <div className="grid grid-cols-2 gap-5">
-                                        <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
-                                        <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                        <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                                        <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期 <span className="text-[11px] font-normal text-slate-400 ml-1">(留空表示“至今”)</span></label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                                     </div>
 
                                     {/* 附件模块 */}
                                     <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60">
-                                        <label className="flex items-center text-[13px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">附件与相关链接</span></label>
+                                        <label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">附件与相关链接</span></label>
                                         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
                                             <label className={`px-4 py-2.5 border rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap shadow-sm flex items-center justify-center ${uploadingObj.isUploading ? 'bg-indigo-50 text-indigo-400 border-indigo-100 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 cursor-pointer'}`}>
                                                 <Icons.Upload /> <span className="ml-1.5">{uploadingObj.isUploading ? `上传中 ${uploadingObj.progress}%` : '上传本地文件'}</span>
                                                 <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploadingObj.isUploading || saving} />
                                             </label>
                                             <div className="flex-1 w-full">
-                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
+                                                <input type="text" value={editingTask.attachmentUrl || ''} onChange={(e) => setEditingTask({...editingTask, attachmentUrl: e.target.value})} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="或直接粘贴链接 (https://...)" disabled={saving} />
                                             </div>
                                         </div>
                                         {editingTask.attachmentName && (
@@ -1038,13 +1054,13 @@
                                         )}
                                     </div>
 
-                                    <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
-                                    <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[13px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
+                                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress} rows="3" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
+                                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail} rows="2" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
 
                                     <div className="grid grid-cols-2 gap-5 pb-2">
                                         <div>
-                                            <label className="block text-[13px] font-semibold text-slate-600 mb-2">底层进度状态</label>
-                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
+                                            <label className="block text-[14px] font-semibold text-slate-600 mb-2">底层进度状态</label>
+                                            <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
                                                 <option value="To Do">待处理 (To Do)</option>
                                                 <option value="In progress">进行中 (In progress)</option>
                                                 <option value="Pending">等待/暂停 (Pending)</option>
@@ -1053,18 +1069,18 @@
                                             
                                             <label className="flex items-center mt-4 cursor-pointer select-none">
                                                 <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500 cursor-pointer" disabled={saving} />
-                                                <span className="ml-2 text-[13px] font-bold text-red-600">🚨 标记为 Need Attention (需高优关注)</span>
+                                                <span className="ml-2 text-[14px] font-bold text-red-600">🚨 标记为 Need Attention (需高优关注)</span>
                                             </label>
                                         </div>
-                                        <div><label className="block text-[13px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
+                                        <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
                                     </div>
                                 </form>
                                 
                                 <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
-                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-slate-400 hover:text-red-500 text-[13px] font-medium transition-colors">删除任务</button> : <div></div>}
+                                    {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving || uploadingObj.isUploading} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
                                     <div className="flex space-x-3">
-                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-5 py-2 text-[13px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
-                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-6 py-2 text-[13px] font-bold text-white rounded-lg transition-all shadow-sm ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5'}`}>
+                                        <button type="button" onClick={() => setEditingTask(null)} disabled={saving || uploadingObj.isUploading} className="px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
+                                        <button type="submit" form="task-form" disabled={saving || uploadingObj.isUploading} className={`px-6 py-2.5 text-[14px] font-bold text-white rounded-lg transition-all shadow-sm ${uploadingObj.isUploading ? 'bg-indigo-300' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5'}`}>
                                             {saving ? '保存中...' : (uploadingObj.isUploading ? '处理文件中' : '确认保存')}
                                         </button>
                                     </div>
@@ -1078,16 +1094,16 @@
                         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 modal-overlay">
                             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col border border-slate-200/50">
                                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-                                    <h2 className="text-base font-bold text-slate-800">批量导入数据</h2>
-                                    <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><Icons.Alert style={{display:'none'}}/><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                    <h2 className="text-lg font-bold text-slate-800">批量导入数据</h2>
+                                    <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><Icons.Alert style={{display:'none'}}/><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 <div className="p-6">
                                     <div className="mb-4 bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
                                         <div>
-                                            <h3 className="text-sm font-bold text-indigo-800 mb-1">直接上传 CSV 文件</h3>
-                                            <p className="text-xs text-indigo-600">系统已适配您表格的格式，支持自动解析合并单元格与多行文本。</p>
+                                            <h3 className="text-[14px] font-bold text-indigo-800 mb-1">直接上传 CSV 文件</h3>
+                                            <p className="text-[13px] text-indigo-600">系统已适配您表格的格式，支持自动解析合并单元格与多行文本。</p>
                                         </div>
-                                        <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg cursor-pointer transition-colors shadow-sm whitespace-nowrap">
+                                        <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold rounded-lg cursor-pointer transition-colors shadow-sm whitespace-nowrap">
                                             选择文件
                                             <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} disabled={saving} />
                                         </label>
@@ -1095,15 +1111,15 @@
                                     
                                     <div className="flex items-center my-3">
                                         <div className="flex-1 border-t border-slate-200"></div>
-                                        <span className="px-3 text-xs text-slate-400 font-medium">或者手动粘贴文本</span>
+                                        <span className="px-3 text-[13px] text-slate-400 font-medium">或者手动粘贴文本</span>
                                         <div className="flex-1 border-t border-slate-200"></div>
                                     </div>
 
-                                    <textarea className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-xs transition-colors leading-relaxed" placeholder="在此粘贴数据..." value={importText} onChange={(e) => setImportText(e.target.value)} disabled={saving}></textarea>
+                                    <textarea className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-[13px] transition-colors leading-relaxed" placeholder="在此粘贴数据..." value={importText} onChange={(e) => setImportText(e.target.value)} disabled={saving}></textarea>
                                 </div>
                                 <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex justify-end space-x-3">
-                                    <button onClick={() => setIsImportModalOpen(false)} className="px-5 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm" disabled={saving}>取消</button>
-                                    <button onClick={handleImportSubmit} className="px-6 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all shadow-sm" disabled={saving}>
+                                    <button onClick={() => setIsImportModalOpen(false)} className="px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm" disabled={saving}>取消</button>
+                                    <button onClick={handleImportSubmit} className="px-6 py-2.5 text-[14px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all shadow-sm" disabled={saving}>
                                         {saving ? '同步解析中...' : '解析并导入'}
                                     </button>
                                 </div>
@@ -1115,7 +1131,7 @@
                     {toastMsg && (
                         <div className="fixed bottom-8 right-8 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-2 animate-bounce z-50">
                             <Icons.Check />
-                            <span className="text-xs font-medium tracking-wide">{toastMsg}</span>
+                            <span className="text-[13px] font-medium tracking-wide">{toastMsg}</span>
                         </div>
                     )}
                 </div>
