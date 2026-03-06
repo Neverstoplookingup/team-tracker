@@ -104,7 +104,7 @@
 
         // 图标组件库
         const Icons = {
-            Alert: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+            Eye: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
             File: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
             Play: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
             Pause: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -119,20 +119,14 @@
         };
 
         const COLUMN_CONFIG = {
-            'Need Attention': { title: 'Need attention', borderColor: 'border-rose-400', headerBg: 'bg-rose-50', text: 'text-rose-600', icon: <Icons.Alert />, barColor: 'bg-rose-500' },
+            'Need Attention': { title: '需过目', borderColor: 'border-rose-400', headerBg: 'bg-rose-50', text: 'text-rose-600', icon: <Icons.Eye />, barColor: 'bg-rose-500' },
             'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File />, barColor: 'bg-slate-400' },
             'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play />, barColor: 'bg-indigo-500' },
             'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause />, barColor: 'bg-amber-400' },
             'Done': { title: '已完成', borderColor: 'border-emerald-400', headerBg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Icons.Check />, barColor: 'bg-emerald-500' }
         };
 
-        const PRIORITY_WEIGHTS = { 'P0 - 极急': 4, 'P1 - 高优': 3, 'P2 - 正常': 2, 'P3 - 暂缓': 1 };
-        const PRIORITY_STYLES = {
-            'P0 - 极急': 'border-l-red-500 border-y-slate-200 border-r-slate-200',
-            'P1 - 高优': 'border-l-orange-400 border-y-slate-200 border-r-slate-200',
-            'P2 - 正常': 'border-l-blue-400 border-y-slate-200 border-r-slate-200',
-            'P3 - 暂缓': 'border-l-slate-300 border-y-slate-200 border-r-slate-200'
-        };
+        const PRIORITY_WEIGHTS = { 'P0 - 紧急': 3, 'P1 - 优先': 2, 'P2 - 正常': 1 };
 
         // 辅助函数
         const generateId = () => 'task-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
@@ -175,16 +169,16 @@
             return isNaN(d.getTime()) ? null : d;
         };
 
-        // 安全获取状态名称，防止因脏数据导致的 split(undefined) 白屏报错
+        // 安全获取状态名称，防止因脏数据导致白屏报错
         const getStatusTitle = (statusKey) => {
             return COLUMN_CONFIG[statusKey] ? COLUMN_CONFIG[statusKey].title : (statusKey || '未知状态');
         };
 
-        // 排序算法：优先级 > 状态 > 创建时间
+        // 排序算法：优先级 > 创建时间
         const sortTasks = (tasksList) => {
             return [...tasksList].sort((a, b) => {
-                const wa = PRIORITY_WEIGHTS[a.priority] || 2;
-                const wb = PRIORITY_WEIGHTS[b.priority] || 2;
+                const wa = PRIORITY_WEIGHTS[a.priority] || 1;
+                const wb = PRIORITY_WEIGHTS[b.priority] || 1;
                 if (wa !== wb) return wb - wa;
                 return getCreatedAt(b) - getCreatedAt(a);
             });
@@ -247,7 +241,6 @@
                 if (onDragEnd) onDragEnd(e);
             };
 
-            const borderClass = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES['P2 - 正常'];
             const isNeedAttention = task.isUrgent === true;
 
             return (
@@ -256,7 +249,7 @@
                     onDragStart={handleDragStart} 
                     onDragEnd={handleDragEnd} 
                     onClick={() => onEdit(task)}
-                    className={`bg-white p-3.5 rounded-xl border-l-[3px] border-y border-r cursor-grab active:cursor-grabbing hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${borderClass} ${isNeedAttention ? 'bg-rose-50/30' : 'shadow-sm'}`}
+                    className={`bg-white p-3.5 rounded-xl border border-slate-200 cursor-grab active:cursor-grabbing hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${isNeedAttention ? 'bg-rose-50/30 ring-1 ring-rose-200/50' : 'shadow-sm'}`}
                 >
                     <div className="flex justify-between items-start mb-2.5">
                         <div className="flex flex-wrap gap-1.5 pr-2 flex-1">
@@ -264,7 +257,7 @@
                             
                             {isNeedAttention && (
                                 <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold rounded-md flex items-center shadow-sm">
-                                    Need attention
+                                    需过目
                                 </span>
                             )}
                             
@@ -276,12 +269,10 @@
                             )}
                         </div>
                         
-                        {/* 右上角优先级徽章 */}
+                        {/* 右上角优先级徽章 (P2正常不显示任何标签) */}
                         <div className="shrink-0 ml-2">
-                            {task.priority === 'P0 - 极急' && <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded shadow-sm">P0</span>}
-                            {task.priority === 'P1 - 高优' && <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded shadow-sm">P1</span>}
-                            {task.priority === 'P2 - 正常' && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm">P2</span>}
-                            {task.priority === 'P3 - 暂缓' && <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">P3</span>}
+                            {task.priority === 'P0 - 紧急' && <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded shadow-sm">P0 紧急</span>}
+                            {task.priority === 'P1 - 优先' && <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded shadow-sm">P1 优先</span>}
                         </div>
                     </div>
                     
@@ -466,7 +457,8 @@
                                         <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <p className="text-[13px] font-semibold text-slate-800 truncate flex items-center">
-                                                    {task.priority === 'P0 - 极急' && <span className="mr-1.5 w-1.5 h-1.5 rounded-full bg-red-500"></span>}
+                                                    {task.priority === 'P0 - 紧急' && <span className="mr-1.5 w-1.5 h-1.5 rounded-full bg-red-500"></span>}
+                                                    {task.priority === 'P1 - 优先' && <span className="mr-1.5 w-1.5 h-1.5 rounded-full bg-orange-400"></span>}
                                                     {task.task}
                                                 </p>
                                                 <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
@@ -599,15 +591,15 @@
                             let data = doc.data();
                             
                             // 老数据自愈转换: 剥离 P0 和 Need Attention 的强制绑定
+                            if (data.priority === 'P0 - 极急') data.priority = 'P0 - 紧急';
+                            if (data.priority === 'P1 - 高优') data.priority = 'P1 - 优先';
+
                             if (data.status === 'Need Attention') {
                                 data.status = 'In progress'; 
                                 data.isUrgent = true;
                             }
-                            if (data.isUrgent && !data.priority) {
-                                data.priority = 'P2 - 正常'; 
-                            }
                             if (!data.priority) {
-                                data.priority = 'P2 - 正常';
+                                data.priority = 'P2 - 正常'; 
                             }
 
                             if (data.category) {
@@ -807,8 +799,8 @@
 
                     let isUrgent = false, status = "To Do", priority = "P2 - 正常";
                     
-                    if (priorityRaw.includes("极急") || priorityRaw.includes("P0")) priority = "P0 - 极急";
-                    else if (priorityRaw.includes("高优") || priorityRaw.includes("P1")) priority = "P1 - 高优";
+                    if (priorityRaw.includes("紧急") || priorityRaw.includes("极急") || priorityRaw.includes("P0")) priority = "P0 - 紧急";
+                    else if (priorityRaw.includes("优先") || priorityRaw.includes("高优") || priorityRaw.includes("P1")) priority = "P1 - 优先";
                     else if (priorityRaw.includes("暂缓") || priorityRaw.includes("P3")) priority = "P3 - 暂缓";
 
                     const sLower = statusRaw.toLowerCase();
@@ -852,7 +844,7 @@
                     '进展动态': t.progress,
                     '底层业务状态': getStatusTitle(t.status),
                     '紧急度(优先级)': t.priority || 'P2 - 正常',
-                    '是否需过目': t.isUrgent ? '是 (Need attention)' : '否',
+                    '是否需过目': t.isUrgent ? '是 (需过目)' : '否',
                     '参与人': t.assignee,
                     '开始日期': t.startDate || '-',
                     '截止日期': t.dueDate || '-',
@@ -1099,17 +1091,17 @@
                                         <tbody className="bg-white divide-y divide-slate-100">
                                             {sortedFilteredTasks.map(task => {
                                                 const config = COLUMN_CONFIG[task.status];
-                                                const isP0 = task.priority === 'P0 - 极急';
-                                                const isP1 = task.priority === 'P1 - 高优';
+                                                const isP0 = task.priority === 'P0 - 紧急';
+                                                const isP1 = task.priority === 'P1 - 优先';
                                                 
                                                 return (
                                                     <tr key={task.id} onClick={() => setEditingTask(task)} className={`hover:bg-slate-50 transition-colors cursor-pointer group`}>
                                                         <td className="px-6 py-4 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-[13px] font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
                                                         <td className="px-6 py-4 text-[13px] text-slate-800 font-medium">
                                                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                                                {isP0 && <span className="text-[10px] px-1.5 py-0.5 bg-red-50 border border-red-100 text-red-600 rounded font-medium">P0 极急</span>}
-                                                                {isP1 && <span className="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 rounded font-medium">P1 高优</span>}
-                                                                {task.isUrgent && <span className="text-[10px] px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 rounded font-medium">Need attention</span>}
+                                                                {isP0 && <span className="text-[10px] px-1.5 py-0.5 bg-red-50 border border-red-100 text-red-600 rounded font-medium">P0 紧急</span>}
+                                                                {isP1 && <span className="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 rounded font-medium">P1 优先</span>}
+                                                                {task.isUrgent && <span className="text-[10px] px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 rounded font-medium">需过目</span>}
                                                                 <span>{task.task}</span>
                                                             </div>
                                                             {task.detail && <div className="text-[11px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
@@ -1161,10 +1153,9 @@
                                         <div>
                                             <label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度 (优先级)</label>
                                             <select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors cursor-pointer" disabled={saving}>
-                                                <option value="P0 - 极急" className="text-red-600">P0 - 极急 (最高优)</option>
-                                                <option value="P1 - 高优" className="text-orange-600">P1 - 高优</option>
+                                                <option value="P0 - 紧急" className="text-red-600">P0 - 紧急</option>
+                                                <option value="P1 - 优先" className="text-orange-600">P1 - 优先</option>
                                                 <option value="P2 - 正常" className="text-slate-700">P2 - 正常</option>
-                                                <option value="P3 - 暂缓" className="text-slate-400">P3 - 暂缓</option>
                                             </select>
                                         </div>
                                     </div>
@@ -1199,9 +1190,9 @@
                                     </div>
                                     
                                     <div className="mt-2 p-3 bg-rose-50/50 border border-rose-200 rounded-xl">
-                                        <label className="flex items-center cursor-pointer select-none">
+                                        <label className="flex items-center cursor-pointer select-none w-fit">
                                             <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} />
-                                            <span className="ml-2 text-[14px] font-bold text-rose-700">标记为 Need attention (需优先关注) <span className="text-xs font-normal text-rose-500 ml-1">(勾选后将显示在看板的专属首列中)</span></span>
+                                            <span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span>
                                         </label>
                                     </div>
                                 </form>
