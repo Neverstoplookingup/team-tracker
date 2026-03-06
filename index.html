@@ -41,8 +41,8 @@
         
         /* 拖拽视觉反馈 */
         .drag-over { 
-            background-color: #eef2ff !important; 
-            border: 2px dashed #818cf8 !important; 
+            background-color: #f3e8ff !important; 
+            border: 2px dashed #a855f7 !important; 
         }
         .dragging { opacity: 0.4; transform: scale(0.98); }
         
@@ -104,7 +104,7 @@
 
         // 图标组件库
         const Icons = {
-            Alert: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+            Eye: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
             File: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
             Play: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
             Pause: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -118,7 +118,7 @@
         };
 
         const COLUMN_CONFIG = {
-            'Need Attention': { title: 'Need Attention', borderColor: 'border-red-400', headerBg: 'bg-red-50', text: 'text-red-600', icon: <Icons.Alert />, barColor: 'bg-red-500' },
+            'Need Attention': { title: '需老板过目', borderColor: 'border-violet-400', headerBg: 'bg-violet-50', text: 'text-violet-700', icon: <Icons.Eye />, barColor: 'bg-violet-500' },
             'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File />, barColor: 'bg-slate-400' },
             'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play />, barColor: 'bg-indigo-500' },
             'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause />, barColor: 'bg-amber-400' },
@@ -126,11 +126,16 @@
         };
 
         const PRIORITY_WEIGHTS = { 'P0 - 极急': 4, 'P1 - 高优': 3, 'P2 - 正常': 2, 'P3 - 暂缓': 1 };
+        const PRIORITY_STYLES = {
+            'P0 - 极急': 'border-l-red-500 border-y-slate-200 border-r-slate-200',
+            'P1 - 高优': 'border-l-orange-400 border-y-slate-200 border-r-slate-200',
+            'P2 - 正常': 'border-l-blue-400 border-y-slate-200 border-r-slate-200',
+            'P3 - 暂缓': 'border-l-slate-300 border-y-slate-200 border-r-slate-200'
+        };
 
         // 辅助函数
         const generateId = () => 'task-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
         
-        // 核心：溯源获取真实的创建时间（兼容老数据）
         const getCreatedAt = (task) => {
             if (task.createdAt) return task.createdAt;
             if (task.id && task.id.startsWith('task-')) {
@@ -161,7 +166,7 @@
             const year = d.getFullYear();
             const hours = d.getHours().toString().padStart(2, '0');
             const minutes = d.getMinutes().toString().padStart(2, '0');
-            return `${month}月${date}日, ${year}, ${hours}:${minutes}`;
+            return `${month}/${date}/${year}, ${hours}:${minutes}`;
         };
         const parseDateOnly = (dateStr) => {
             if (!dateStr) return null;
@@ -169,11 +174,11 @@
             return isNaN(d.getTime()) ? null : d;
         };
 
-        // 排序算法：优先级 > 创建时间
+        // 排序算法：优先级 > 状态 > 创建时间
         const sortTasks = (tasksList) => {
             return [...tasksList].sort((a, b) => {
-                const wa = PRIORITY_WEIGHTS[a.priority] || (a.isUrgent ? 4 : 2);
-                const wb = PRIORITY_WEIGHTS[b.priority] || (b.isUrgent ? 4 : 2);
+                const wa = PRIORITY_WEIGHTS[a.priority] || 2;
+                const wb = PRIORITY_WEIGHTS[b.priority] || 2;
                 if (wa !== wb) return wb - wa;
                 return getCreatedAt(b) - getCreatedAt(a);
             });
@@ -236,8 +241,8 @@
                 if (onDragEnd) onDragEnd(e);
             };
 
-            const isP0 = task.priority === 'P0 - 极急' || task.isUrgent;
-            const isP1 = task.priority === 'P1 - 高优';
+            const borderClass = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES['P2 - 正常'];
+            const isNeedAttention = task.isUrgent === true;
 
             return (
                 <div 
@@ -245,29 +250,32 @@
                     onDragStart={handleDragStart} 
                     onDragEnd={handleDragEnd} 
                     onClick={() => onEdit(task)}
-                    className={`bg-white p-3.5 rounded-xl border cursor-grab active:cursor-grabbing hover:border-indigo-300 hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${isP0 ? 'border-red-300 shadow-sm shadow-red-100' : (isP1 ? 'border-orange-200' : 'border-slate-200')}`}
+                    className={`bg-white p-3.5 rounded-xl border-l-[5px] border-y border-r cursor-grab active:cursor-grabbing hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${borderClass} ${isNeedAttention ? 'ring-2 ring-violet-200 shadow-violet-100 bg-violet-50/30' : 'shadow-sm'}`}
                 >
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="flex flex-wrap gap-1.5 pr-8">
-                            {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[11px] font-medium rounded-md">{task.category || '未分类'}</span>}
+                    <div className="flex justify-between items-start mb-2.5">
+                        <div className="flex flex-wrap gap-1.5 pr-2 flex-1">
+                            {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">{task.category || '未分类'}</span>}
                             
-                            {/* 优先级标识渲染 */}
-                            {isP0 ? (
-                                <span className="px-1.5 py-0.5 border border-red-200 bg-red-50 text-red-600 text-[11px] font-bold rounded-md flex items-center shadow-sm">
-                                    🚨 极急
+                            {isNeedAttention && (
+                                <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 border border-violet-200 text-[10px] font-bold rounded-md flex items-center shadow-sm">
+                                    👀 待过目
                                 </span>
-                            ) : isP1 ? (
-                                <span className="px-1.5 py-0.5 border border-orange-200 bg-orange-50 text-orange-600 text-[11px] font-bold rounded-md flex items-center shadow-sm">
-                                    🔥 高优
-                                </span>
-                            ) : null}
+                            )}
                             
-                            {/* 如果在 Need Attention 列，展示实际底层状态 */}
-                            {(isP0) && task.status && (
-                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">
+                            {/* 如果在过目列中，显示原底层状态 */}
+                            {isNeedAttention && task.status && (
+                                <span className="px-1.5 py-0.5 bg-white text-slate-500 border border-slate-200 text-[10px] font-medium rounded-md flex items-center">
                                     {COLUMN_CONFIG[task.status]?.title.split(' ')[0] || task.status}
                                 </span>
                             )}
+                        </div>
+                        
+                        {/* 右上角优先级徽章 */}
+                        <div className="shrink-0 ml-2">
+                            {task.priority === 'P0 - 极急' && <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded shadow-sm">🚨 P0</span>}
+                            {task.priority === 'P1 - 高优' && <span className="text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded shadow-sm">🔥 P1</span>}
+                            {task.priority === 'P2 - 正常' && <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm">🔵 P2</span>}
+                            {task.priority === 'P3 - 暂缓' && <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">🟢 P3</span>}
                         </div>
                     </div>
                     
@@ -289,7 +297,7 @@
 
                     {task.attachmentUrl && (
                         <div className="mt-auto mb-3">
-                            <button onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }} className="max-w-full flex items-center space-x-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-md text-xs text-slate-600 hover:text-indigo-600 transition-colors shadow-sm w-fit" title={task.attachmentName || '查看附件'}>
+                            <button onClick={(e) => { e.stopPropagation(); window.open(task.attachmentUrl, '_blank'); }} className="max-w-full flex items-center space-x-1.5 px-2 py-1 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-md text-xs text-slate-600 hover:text-indigo-600 transition-colors shadow-sm w-fit" title={task.attachmentName || '查看附件'}>
                                 <Icons.Link />
                                 <span className="truncate max-w-[140px] font-medium">{task.attachmentName || '访问链接'}</span>
                             </button>
@@ -335,9 +343,8 @@
                             {columns.map(status => {
                                 const config = COLUMN_CONFIG[status];
                                 const rawTasks = catTasks.filter(t => {
-                                    const isUrgent = t.priority === 'P0 - 极急' || t.isUrgent;
-                                    if (status === 'Need Attention') return isUrgent;
-                                    return t.status === status && !isUrgent;
+                                    if (status === 'Need Attention') return t.isUrgent === true;
+                                    return t.status === status && !t.isUrgent;
                                 });
                                 // 在泳道列中也应用排序
                                 const colTasks = sortTasks(rawTasks);
@@ -351,7 +358,7 @@
                                         onDragOver={(e) => onDragOver(e, dropKey)} 
                                         onDragLeave={onDragLeave} 
                                         onDrop={(e) => onDrop(e, status, catName)} 
-                                        className={`flex-shrink-0 w-[290px] flex flex-col rounded-xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
+                                        className={`flex-shrink-0 w-[300px] flex flex-col rounded-xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
                                     >
                                         <div className={`px-3 py-2.5 flex justify-between items-center border-b border-slate-100/50 ${config.headerBg}`}>
                                             <h3 className={`font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}`}>
@@ -360,9 +367,9 @@
                                             </h3>
                                             <span className={`text-[11px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
                                         </div>
-                                        <div className="p-2.5 flex-1 space-y-2.5 overflow-y-auto custom-scrollbar max-h-[500px]">
+                                        <div className="p-2.5 flex-1 space-y-3 overflow-y-auto custom-scrollbar max-h-[500px]">
                                             {colTasks.length === 0 ? (
-                                                <div className="h-full min-h-[80px] rounded-lg border-2 border-dashed border-slate-100 flex items-center justify-center text-slate-300 text-xs">拖拽至此</div>
+                                                <div className="h-full min-h-[80px] rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs">拖拽至此</div>
                                             ) : (
                                                 colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} hideCategoryLabel={true} />)
                                             )}
@@ -444,8 +451,8 @@
                                 const durationDays = (task._end.getTime() - task._start.getTime()) / 86400000 + 1;
                                 
                                 const config = COLUMN_CONFIG[task.status];
-                                const isUrgent = task.priority === 'P0 - 极急' || task.isUrgent;
-                                const barColorClass = isUrgent ? 'bg-red-500' : (config ? config.barColor : 'bg-slate-400');
+                                const isNeedAttention = task.isUrgent === true;
+                                const barColorClass = isNeedAttention ? 'bg-violet-500' : (config ? config.barColor : 'bg-slate-400');
                                 const barWidth = Math.max(durationDays * DAY_WIDTH, 12);
 
                                 return (
@@ -453,7 +460,7 @@
                                         <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <p className="text-[13px] font-semibold text-slate-800 truncate flex items-center">
-                                                    {isUrgent && <span className="mr-1 text-[10px]">🚨</span>}
+                                                    {task.priority === 'P0 - 极急' && <span className="mr-1 text-[10px] text-red-600">🚨</span>}
                                                     {task.task}
                                                 </p>
                                                 <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
@@ -465,7 +472,7 @@
                                                 className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
                                                 style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${barWidth}px` }}
                                                 onClick={() => onEdit(task)}
-                                                title={`状态: ${task.status}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '至今'}`}
+                                                title={`状态: ${task.status}\n优先级: ${task.priority}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '至今'}`}
                                             >
                                                 {barWidth > 40 && <span className="text-[11px] font-bold text-white truncate mix-blend-screen pl-1">{task.progress || '查看详情'}</span>}
                                             </div>
@@ -523,15 +530,13 @@
             const [loading, setLoading] = useState(true);
             const [saving, setSaving] = useState(false);
 
-            // 视图状态与所有筛选器 (新增日期筛选)
+            // 视图状态与所有筛选器
             const [filters, setFilters] = useState({ 
                 view: 'kanban', 
                 search: '', 
                 category: 'All', 
                 assignee: 'All', 
-                status: 'All',
-                createdMonth: '', // 形如 "2026-03"
-                createdDate: ''   // 形如 "2026-03-06"
+                status: 'All'
             });
             const [draggedOverCol, setDraggedOverCol] = useState(null);
             
@@ -587,14 +592,16 @@
                         snapshot.forEach(doc => {
                             let data = doc.data();
                             
-                            // 老数据自愈转换
+                            // 老数据自愈转换: 剥离 P0 和 Need Attention 的强制绑定
                             if (data.status === 'Need Attention') {
                                 data.status = 'In progress'; 
-                                data.priority = 'P0 - 极急';
                                 data.isUrgent = true;
                             }
                             if (data.isUrgent && !data.priority) {
-                                data.priority = 'P0 - 极急';
+                                data.priority = 'P2 - 正常'; // 以前默认给的是P0，现在恢复正常，如果真的是P0需要用户手动改
+                            }
+                            if (!data.priority) {
+                                data.priority = 'P2 - 正常';
                             }
 
                             if (data.category) {
@@ -654,7 +661,7 @@
                     progress: formData.get('progress').trim(),
                     status: formData.get('status'),
                     priority: priorityVal,
-                    isUrgent: priorityVal === 'P0 - 极急', // 向下兼容冗余字段
+                    isUrgent: formData.get('isUrgent') === 'on', // 独立判断是否在 Need Attention 列
                     assignee: formData.get('assignee').trim(),
                     startDate: sDate || '',
                     dueDate: eDate || '',
@@ -699,17 +706,12 @@
                 let updatedFields = { updatedAt: Date.now() };
                 if (newCategory) updatedFields.category = newCategory;
 
+                // 解耦处理：拖入第一列只改变 isUrgent 状态，不修改其真实底层 status 和 priority
                 if (targetStatus === 'Need Attention') {
-                    // 若放入 Need Attention 栏，自动拉满优先级
-                    updatedFields.priority = 'P0 - 极急';
                     updatedFields.isUrgent = true;
                 } else {
                     updatedFields.status = targetStatus;
-                    // 离开 Need Attention 栏，如果原本是极急，则降级为高优，防止一直赖在极急
-                    if (taskToMove.priority === 'P0 - 极急') {
-                        updatedFields.priority = 'P1 - 高优';
-                        updatedFields.isUrgent = false;
-                    }
+                    updatedFields.isUrgent = false;
                 }
 
                 setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updatedFields } : t));
@@ -804,7 +806,7 @@
                     else if (priorityRaw.includes("暂缓") || priorityRaw.includes("P3")) priority = "P3 - 暂缓";
 
                     const sLower = statusRaw.toLowerCase();
-                    if (sLower.includes("attention") || sLower.includes("重点")) { isUrgent = true; status = "In progress"; priority = "P0 - 极急"; } 
+                    if (sLower.includes("attention") || sLower.includes("过目") || sLower.includes("批示")) { isUrgent = true; status = "In progress"; } 
                     else if (sLower.includes("progress") || sLower.includes("进行")) { status = "In progress"; } 
                     else if (sLower.includes("done") || sLower.includes("完成")) { status = "Done"; } 
                     else if (sLower.includes("pending") || sLower.includes("暂缓")) { status = "Pending"; } 
@@ -812,7 +814,7 @@
                     
                     parsedData.push({ 
                         id: `task-imp-${Date.now()}-${i}`, category: normalizedCat, 
-                        task: task || "未命名事项", detail, progress, status, priority, isUrgent: priority === 'P0 - 极急', assignee: assignee || "未分配", 
+                        task: task || "未命名事项", detail, progress, status, priority, isUrgent: isUrgent, assignee: assignee || "未分配", 
                         startDate: '', dueDate: '', attachmentUrl: '', attachmentName: '', updatedAt: Date.now(), createdAt: Date.now()
                     });
                 }
@@ -842,12 +844,13 @@
                     '事项标题': t.task,
                     '内部说明': t.detail,
                     '进展动态': t.progress,
-                    '状态': t.status,
-                    '紧急度': t.priority || (t.isUrgent ? 'P0 - 极急' : 'P2 - 正常'),
+                    '底层业务状态': t.status,
+                    '紧急度(优先级)': t.priority || 'P2 - 正常',
+                    '是否卡点需过目': t.isUrgent ? '是 (Need Attention)' : '否',
                     '参与人': t.assignee,
                     '开始日期': t.startDate || '-',
                     '截止日期': t.dueDate || '-',
-                    '添加日期': formatDateTime(getCreatedAt(t))
+                    '最后修订时间': formatDateTime(t.updatedAt)
                 }));
                 const ws1 = XLSX.utils.json_to_sheet(ws1Data);
                 XLSX.utils.book_append_sheet(wb, ws1, "列表清单");
@@ -861,7 +864,8 @@
                         '板块分类': t.category,
                         '事项标题': t.task,
                         '状态': t.status,
-                        '紧急度': t.priority || (t.isUrgent ? 'P0 - 极急' : 'P2 - 正常'),
+                        '紧急度': t.priority || 'P2 - 正常',
+                        '需过目': t.isUrgent ? '是' : '否',
                         '开始时间': t.startDate || '未定',
                         '截止时间': t.dueDate || '至今',
                         '持续天数': days,
@@ -875,12 +879,16 @@
                 const ws3Data = [];
                 categories.filter(c => c !== 'All').forEach(cat => {
                     columns.forEach(status => {
-                        const cellTasks = sortTasks(filteredTasks.filter(t => t.category === cat && t.status === status));
+                        const cellTasks = sortTasks(filteredTasks.filter(t => {
+                            if (status === 'Need Attention') return t.category === cat && t.isUrgent === true;
+                            return t.category === cat && t.status === status && !t.isUrgent;
+                        }));
                         cellTasks.forEach(t => {
                             ws3Data.push({
                                 '板块分类': cat,
-                                '状态列': status,
-                                '紧急度': t.priority || (t.isUrgent ? 'P0 - 极急' : 'P2 - 正常'),
+                                '所处流程列': COLUMN_CONFIG[status]?.title || status,
+                                '底层状态': t.status,
+                                '紧急度': t.priority || 'P2 - 正常',
                                 '事项标题': t.task,
                                 '进展动态': t.progress,
                                 '参与人': t.assignee
@@ -894,29 +902,16 @@
                 XLSX.writeFile(wb, `工作台导出_${new Date().toISOString().split('T')[0]}.xlsx`);
             };
 
-            // 过滤与计算 (加入了全栈过滤：日期、状态、优先级)
+            // 过滤与计算 (加入了全栈过滤：状态、优先级等)
             const filteredTasks = useMemo(() => {
                 return [...tasks].filter(t => {
                     const matchSearch = `${t.task} ${t.detail} ${t.progress} ${t.assignee}`.toLowerCase().includes(filters.search.toLowerCase());
                     const matchCat = filters.category === 'All' || t.category === filters.category;
                     const matchAssignee = filters.assignee === 'All' || (t.assignee && t.assignee.includes(filters.assignee));
-                    const isTaskP0 = t.priority === 'P0 - 极急' || t.isUrgent;
-                    const matchStatus = filters.status === 'All' || t.status === filters.status || (filters.status === 'Need Attention' && isTaskP0);
-                    
-                    let matchDate = true;
-                    if (filters.createdMonth || filters.createdDate) {
-                        const d = new Date(getCreatedAt(t));
-                        const tzOffset = d.getTimezoneOffset() * 60000;
-                        const localISODate = (new Date(d - tzOffset)).toISOString().split('T')[0]; // YYYY-MM-DD
-                        
-                        if (filters.createdDate) {
-                            matchDate = (localISODate === filters.createdDate);
-                        } else if (filters.createdMonth) {
-                            matchDate = (localISODate.substring(0, 7) === filters.createdMonth);
-                        }
-                    }
+                    const isTaskNeedAttention = t.isUrgent === true;
+                    const matchStatus = filters.status === 'All' || t.status === filters.status || (filters.status === 'Need Attention' && isTaskNeedAttention);
 
-                    return matchSearch && matchCat && matchAssignee && matchStatus && matchDate;
+                    return matchSearch && matchCat && matchAssignee && matchStatus;
                 });
             }, [tasks, filters]);
 
@@ -968,7 +963,7 @@
                             <button onClick={() => setIsImportModalOpen(true)} className="flex items-center space-x-1.5 bg-white text-slate-600 border border-slate-300 px-4 py-2 rounded-lg text-[13px] font-medium hover:bg-slate-50 transition-colors shadow-sm">
                                 <Icons.Upload /> <span>导入</span>
                             </button>
-                            <button onClick={() => setEditingTask({ status: 'To Do', priority: 'P2 - 正常' })} className="flex items-center space-x-1.5 bg-indigo-600 text-white px-5 py-2 rounded-lg text-[13px] font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
+                            <button onClick={() => setEditingTask({ status: 'To Do', priority: 'P2 - 正常', isUrgent: false })} className="flex items-center space-x-1.5 bg-indigo-600 text-white px-5 py-2 rounded-lg text-[13px] font-medium hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-200">
                                 <span className="text-lg leading-none mb-0.5">+</span> <span>新建任务</span>
                             </button>
                         </div>
@@ -977,17 +972,6 @@
                     {/* 控制栏 (多重筛选) */}
                     <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-2.5 flex items-center justify-between shrink-0 z-10">
                         <div className="flex items-center space-x-4 overflow-x-auto custom-scrollbar py-1">
-                            
-                            <div className="flex items-center space-x-2 border-r border-slate-200 pr-4 shrink-0">
-                                <span className="text-[12px] font-medium text-slate-400 uppercase tracking-wider flex items-center"><Icons.Calendar /><span className="ml-1">日期筛选</span></span>
-                                <input type="month" title="按月筛选" value={filters.createdMonth} onChange={e => setFilters({...filters, createdMonth: e.target.value, createdDate: ''})} className="text-[12px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" />
-                                <span className="text-[10px] text-slate-300">或</span>
-                                <input type="date" title="按天筛选" value={filters.createdDate} onChange={e => setFilters({...filters, createdDate: e.target.value, createdMonth: ''})} className="text-[12px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer" />
-                                {(filters.createdMonth || filters.createdDate) && (
-                                    <button onClick={() => setFilters({...filters, createdDate: '', createdMonth: ''})} className="text-[10px] text-red-400 hover:text-red-600 bg-red-50 px-1.5 py-1 rounded">清除</button>
-                                )}
-                            </div>
-
                             <div className="flex items-center space-x-2 shrink-0">
                                 <span className="text-[12px] font-medium text-slate-400 uppercase tracking-wider">执行人</span>
                                 <select className="text-[12px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer max-w-[100px] truncate" value={filters.assignee} onChange={(e) => setFilters(f => ({...f, assignee: e.target.value}))}>
@@ -1030,9 +1014,9 @@
                                 {columns.map(status => {
                                     const config = COLUMN_CONFIG[status];
                                     const rawTasks = filteredTasks.filter(t => {
-                                        const isUrgent = t.priority === 'P0 - 极急' || t.isUrgent;
-                                        if (status === 'Need Attention') return isUrgent;
-                                        return t.status === status && !isUrgent;
+                                        const isNeedAttention = t.isUrgent === true;
+                                        if (status === 'Need Attention') return isNeedAttention;
+                                        return t.status === status && !isNeedAttention;
                                     });
                                     // 看板列任务内部优先按“紧急度”排序
                                     const colTasks = sortTasks(rawTasks);
@@ -1103,13 +1087,13 @@
                                                         </select>
                                                     </div>
                                                 </th>
-                                                <th className="px-6 py-3 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-48 text-right">添加时间 (创建日期)</th>
+                                                <th className="px-6 py-3 text-[13px] font-semibold text-slate-500 uppercase tracking-wider w-48 text-right">最后修订时间</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
                                             {sortedFilteredTasks.map(task => {
                                                 const config = COLUMN_CONFIG[task.status];
-                                                const isP0 = task.priority === 'P0 - 极急' || task.isUrgent;
+                                                const isP0 = task.priority === 'P0 - 极急';
                                                 const isP1 = task.priority === 'P1 - 高优';
                                                 
                                                 return (
@@ -1119,6 +1103,7 @@
                                                             <div className="flex items-center gap-2 mb-1.5">
                                                                 {isP0 && <span className="text-[11px] px-1 bg-red-100 text-red-600 rounded font-bold">极急</span>}
                                                                 {isP1 && <span className="text-[11px] px-1 bg-orange-100 text-orange-600 rounded font-bold">高优</span>}
+                                                                {task.isUrgent && <span className="text-[10px] px-1 bg-violet-100 text-violet-700 border border-violet-200 rounded font-bold">👀待过目</span>}
                                                                 <span>{task.task}</span>
                                                             </div>
                                                             {task.detail && <div className="text-[11px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
@@ -1138,7 +1123,7 @@
                                                             ) : '-'}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap"><AvatarGroup name={task.assignee} /></td>
-                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-[12px] text-slate-500 font-mono tracking-tight">{formatDateTime(getCreatedAt(task))}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-[12px] text-slate-500 font-mono tracking-tight">{formatDateTime(task.updatedAt)}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -1169,7 +1154,7 @@
                                         </div>
                                         <div>
                                             <label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度 (优先级)</label>
-                                            <select name="priority" defaultValue={editingTask.priority || (editingTask.isUrgent ? 'P0 - 极急' : 'P2 - 正常')} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors cursor-pointer" disabled={saving}>
+                                            <select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors cursor-pointer" disabled={saving}>
                                                 <option value="P0 - 极急" className="text-red-600">🚨 P0 - 极急 (最高优)</option>
                                                 <option value="P1 - 高优" className="text-orange-600">🔥 P1 - 高优</option>
                                                 <option value="P2 - 正常" className="text-slate-700">🔵 P2 - 正常</option>
@@ -1196,16 +1181,22 @@
 
                                     <div className="grid grid-cols-2 gap-5 pb-2">
                                         <div>
-                                            <label className="block text-[14px] font-semibold text-slate-600 mb-2">底层状态列</label>
+                                            <label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label>
                                             <select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
                                                 <option value="To Do">待处理 (To Do)</option>
                                                 <option value="In progress">进行中 (In progress)</option>
-                                                <option value="Need Attention">🚨 Need Attention栏</option>
                                                 <option value="Pending">等待/暂停 (Pending)</option>
                                                 <option value="Done">已完成 (Done)</option>
                                             </select>
                                         </div>
                                         <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
+                                    </div>
+                                    
+                                    <div className="mt-2 p-3 bg-violet-50/50 border border-violet-200 rounded-xl">
+                                        <label className="flex items-center cursor-pointer select-none">
+                                            <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-violet-600 rounded border-violet-300 focus:ring-violet-500 cursor-pointer" disabled={saving} />
+                                            <span className="ml-2 text-[14px] font-bold text-violet-700">👀 遇到卡点，需要老板批示/过目 <span className="text-xs font-normal text-violet-500 ml-1">(勾选后将显示在看板的专属首列中)</span></span>
+                                        </label>
                                     </div>
                                 </form>
                                 
