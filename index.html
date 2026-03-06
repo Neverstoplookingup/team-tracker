@@ -41,8 +41,8 @@
         
         /* 拖拽视觉反馈 */
         .drag-over { 
-            background-color: #f3e8ff !important; 
-            border: 2px dashed #a855f7 !important; 
+            background-color: #fff1f2 !important; 
+            border: 2px dashed #fb7185 !important; 
         }
         .dragging { opacity: 0.4; transform: scale(0.98); }
         
@@ -104,7 +104,7 @@
 
         // 图标组件库
         const Icons = {
-            Eye: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+            Alert: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
             File: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
             Play: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
             Pause: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -114,11 +114,12 @@
             Search: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
             Download: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
             Upload: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
-            Calendar: () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            Calendar: () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+            EmptyBox: () => <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
         };
 
         const COLUMN_CONFIG = {
-            'Need Attention': { title: '需老板过目', borderColor: 'border-violet-400', headerBg: 'bg-violet-50', text: 'text-violet-700', icon: <Icons.Eye />, barColor: 'bg-violet-500' },
+            'Need Attention': { title: 'Need attention', borderColor: 'border-rose-400', headerBg: 'bg-rose-50', text: 'text-rose-600', icon: <Icons.Alert />, barColor: 'bg-rose-500' },
             'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File />, barColor: 'bg-slate-400' },
             'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play />, barColor: 'bg-indigo-500' },
             'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause />, barColor: 'bg-amber-400' },
@@ -172,6 +173,11 @@
             if (!dateStr) return null;
             const d = new Date(dateStr);
             return isNaN(d.getTime()) ? null : d;
+        };
+
+        // 安全获取状态名称，防止因脏数据导致的 split(undefined) 白屏报错
+        const getStatusTitle = (statusKey) => {
+            return COLUMN_CONFIG[statusKey] ? COLUMN_CONFIG[statusKey].title : (statusKey || '未知状态');
         };
 
         // 排序算法：优先级 > 状态 > 创建时间
@@ -250,32 +256,32 @@
                     onDragStart={handleDragStart} 
                     onDragEnd={handleDragEnd} 
                     onClick={() => onEdit(task)}
-                    className={`bg-white p-3.5 rounded-xl border-l-[5px] border-y border-r cursor-grab active:cursor-grabbing hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${borderClass} ${isNeedAttention ? 'ring-2 ring-violet-200 shadow-violet-100 bg-violet-50/30' : 'shadow-sm'}`}
+                    className={`bg-white p-3.5 rounded-xl border-l-[3px] border-y border-r cursor-grab active:cursor-grabbing hover:shadow-md smooth-transition group relative flex flex-col min-h-[100px] ${borderClass} ${isNeedAttention ? 'bg-rose-50/30' : 'shadow-sm'}`}
                 >
                     <div className="flex justify-between items-start mb-2.5">
                         <div className="flex flex-wrap gap-1.5 pr-2 flex-1">
                             {!hideCategoryLabel && <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-medium rounded-md">{task.category || '未分类'}</span>}
                             
                             {isNeedAttention && (
-                                <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 border border-violet-200 text-[10px] font-bold rounded-md flex items-center shadow-sm">
-                                    👀 待过目
+                                <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold rounded-md flex items-center shadow-sm">
+                                    Need attention
                                 </span>
                             )}
                             
                             {/* 如果在过目列中，显示原底层状态 */}
                             {isNeedAttention && task.status && (
                                 <span className="px-1.5 py-0.5 bg-white text-slate-500 border border-slate-200 text-[10px] font-medium rounded-md flex items-center">
-                                    {COLUMN_CONFIG[task.status]?.title.split(' ')[0] || task.status}
+                                    {getStatusTitle(task.status)}
                                 </span>
                             )}
                         </div>
                         
                         {/* 右上角优先级徽章 */}
                         <div className="shrink-0 ml-2">
-                            {task.priority === 'P0 - 极急' && <span className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded shadow-sm">🚨 P0</span>}
-                            {task.priority === 'P1 - 高优' && <span className="text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded shadow-sm">🔥 P1</span>}
-                            {task.priority === 'P2 - 正常' && <span className="text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm">🔵 P2</span>}
-                            {task.priority === 'P3 - 暂缓' && <span className="text-[11px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">🟢 P3</span>}
+                            {task.priority === 'P0 - 极急' && <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded shadow-sm">P0</span>}
+                            {task.priority === 'P1 - 高优' && <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded shadow-sm">P1</span>}
+                            {task.priority === 'P2 - 正常' && <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded shadow-sm">P2</span>}
+                            {task.priority === 'P3 - 暂缓' && <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shadow-sm">P3</span>}
                         </div>
                     </div>
                     
@@ -452,7 +458,7 @@
                                 
                                 const config = COLUMN_CONFIG[task.status];
                                 const isNeedAttention = task.isUrgent === true;
-                                const barColorClass = isNeedAttention ? 'bg-violet-500' : (config ? config.barColor : 'bg-slate-400');
+                                const barColorClass = isNeedAttention ? 'bg-rose-500' : (config ? config.barColor : 'bg-slate-400');
                                 const barWidth = Math.max(durationDays * DAY_WIDTH, 12);
 
                                 return (
@@ -460,7 +466,7 @@
                                         <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                                             <div className="flex-1 min-w-0 pr-2">
                                                 <p className="text-[13px] font-semibold text-slate-800 truncate flex items-center">
-                                                    {task.priority === 'P0 - 极急' && <span className="mr-1 text-[10px] text-red-600">🚨</span>}
+                                                    {task.priority === 'P0 - 极急' && <span className="mr-1.5 w-1.5 h-1.5 rounded-full bg-red-500"></span>}
                                                     {task.task}
                                                 </p>
                                                 <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
@@ -472,7 +478,7 @@
                                                 className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
                                                 style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${barWidth}px` }}
                                                 onClick={() => onEdit(task)}
-                                                title={`状态: ${task.status}\n优先级: ${task.priority}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '至今'}`}
+                                                title={`状态: ${getStatusTitle(task.status)}\n优先级: ${task.priority}\n时间: ${task.startDate || '未定'} 至 ${task.dueDate || '至今'}`}
                                             >
                                                 {barWidth > 40 && <span className="text-[11px] font-bold text-white truncate mix-blend-screen pl-1">{task.progress || '查看详情'}</span>}
                                             </div>
@@ -598,7 +604,7 @@
                                 data.isUrgent = true;
                             }
                             if (data.isUrgent && !data.priority) {
-                                data.priority = 'P2 - 正常'; // 以前默认给的是P0，现在恢复正常，如果真的是P0需要用户手动改
+                                data.priority = 'P2 - 正常'; 
                             }
                             if (!data.priority) {
                                 data.priority = 'P2 - 正常';
@@ -844,9 +850,9 @@
                     '事项标题': t.task,
                     '内部说明': t.detail,
                     '进展动态': t.progress,
-                    '底层业务状态': t.status,
+                    '底层业务状态': getStatusTitle(t.status),
                     '紧急度(优先级)': t.priority || 'P2 - 正常',
-                    '是否卡点需过目': t.isUrgent ? '是 (Need Attention)' : '否',
+                    '是否需过目': t.isUrgent ? '是 (Need attention)' : '否',
                     '参与人': t.assignee,
                     '开始日期': t.startDate || '-',
                     '截止日期': t.dueDate || '-',
@@ -863,7 +869,7 @@
                     return {
                         '板块分类': t.category,
                         '事项标题': t.task,
-                        '状态': t.status,
+                        '状态': getStatusTitle(t.status),
                         '紧急度': t.priority || 'P2 - 正常',
                         '需过目': t.isUrgent ? '是' : '否',
                         '开始时间': t.startDate || '未定',
@@ -886,8 +892,8 @@
                         cellTasks.forEach(t => {
                             ws3Data.push({
                                 '板块分类': cat,
-                                '所处流程列': COLUMN_CONFIG[status]?.title || status,
-                                '底层状态': t.status,
+                                '所处流程列': getStatusTitle(status),
+                                '底层状态': getStatusTitle(t.status),
                                 '紧急度': t.priority || 'P2 - 正常',
                                 '事项标题': t.task,
                                 '进展动态': t.progress,
@@ -981,7 +987,7 @@
                             <div className="flex items-center space-x-2 shrink-0">
                                 <span className="text-[12px] font-medium text-slate-400 uppercase tracking-wider">状态</span>
                                 <select className="text-[12px] bg-slate-50 border border-slate-200 rounded-md py-1.5 px-2 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium cursor-pointer max-w-[120px] truncate" value={filters.status} onChange={(e) => setFilters(f => ({...f, status: e.target.value}))}>
-                                    {statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部' : (COLUMN_CONFIG[s]?.title || s)}</option>)}
+                                    {statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部' : getStatusTitle(s)}</option>)}
                                 </select>
                             </div>
                             <div className="flex items-center space-x-2 shrink-0">
@@ -1005,7 +1011,7 @@
                     <main className="flex-1 overflow-hidden p-6 relative">
                         {tasks.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
-                                <div className="text-4xl mb-4 opacity-50">✨</div>
+                                <div className="flex justify-center items-center text-slate-300 mb-4 opacity-50"><Icons.EmptyBox /></div>
                                 <h3 className="text-base font-medium text-slate-700 mb-1">开始你的第一个项目</h3>
                                 <p className="text-sm mb-4">点击右上角新建任务，或导入已有的 Excel 数据。</p>
                             </div>
@@ -1097,13 +1103,13 @@
                                                 const isP1 = task.priority === 'P1 - 高优';
                                                 
                                                 return (
-                                                    <tr key={task.id} onClick={() => setEditingTask(task)} className={`hover:bg-slate-50/80 transition-colors cursor-pointer group ${isP0 ? 'bg-red-50/30' : ''}`}>
+                                                    <tr key={task.id} onClick={() => setEditingTask(task)} className={`hover:bg-slate-50 transition-colors cursor-pointer group`}>
                                                         <td className="px-6 py-4 whitespace-nowrap"><span className="bg-slate-100 text-slate-600 text-[13px] font-medium px-2 py-1 rounded-md">{task.category || '-'}</span></td>
                                                         <td className="px-6 py-4 text-[13px] text-slate-800 font-medium">
-                                                            <div className="flex items-center gap-2 mb-1.5">
-                                                                {isP0 && <span className="text-[11px] px-1 bg-red-100 text-red-600 rounded font-bold">极急</span>}
-                                                                {isP1 && <span className="text-[11px] px-1 bg-orange-100 text-orange-600 rounded font-bold">高优</span>}
-                                                                {task.isUrgent && <span className="text-[10px] px-1 bg-violet-100 text-violet-700 border border-violet-200 rounded font-bold">👀待过目</span>}
+                                                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                                                {isP0 && <span className="text-[10px] px-1.5 py-0.5 bg-red-50 border border-red-100 text-red-600 rounded font-medium">P0 极急</span>}
+                                                                {isP1 && <span className="text-[10px] px-1.5 py-0.5 bg-orange-50 border border-orange-100 text-orange-600 rounded font-medium">P1 高优</span>}
+                                                                {task.isUrgent && <span className="text-[10px] px-1.5 py-0.5 bg-rose-50 border border-rose-100 text-rose-600 rounded font-medium">Need attention</span>}
                                                                 <span>{task.task}</span>
                                                             </div>
                                                             {task.detail && <div className="text-[11px] text-slate-400 line-clamp-1 font-normal">{task.detail}</div>}
@@ -1111,7 +1117,7 @@
                                                         <td className="px-6 py-4 text-[13px] text-slate-600"><div className="line-clamp-2 leading-relaxed">{task.progress || '-'}</div></td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <span className={`px-2.5 py-1 inline-flex text-[11px] font-semibold rounded-md border ${config ? config.headerBg + ' ' + config.text + ' border-transparent' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                                                                {config?.title.split(' ')[0] || task.status}
+                                                                {getStatusTitle(task.status)}
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-[11px] text-slate-500 whitespace-nowrap leading-relaxed">
@@ -1143,7 +1149,7 @@
                                         {editingTask.id ? '编辑任务' : '新建任务'}
                                         {saving && <span className="ml-3 text-[13px] text-indigo-500 font-normal flex items-center"><span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping mr-2"></span>同步中...</span>}
                                     </h2>
-                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><Icons.Alert style={{display:'none'}}/><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                    <button type="button" onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 
                                 <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
@@ -1155,10 +1161,10 @@
                                         <div>
                                             <label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度 (优先级)</label>
                                             <select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors cursor-pointer" disabled={saving}>
-                                                <option value="P0 - 极急" className="text-red-600">🚨 P0 - 极急 (最高优)</option>
-                                                <option value="P1 - 高优" className="text-orange-600">🔥 P1 - 高优</option>
-                                                <option value="P2 - 正常" className="text-slate-700">🔵 P2 - 正常</option>
-                                                <option value="P3 - 暂缓" className="text-slate-400">🟢 P3 - 暂缓</option>
+                                                <option value="P0 - 极急" className="text-red-600">P0 - 极急 (最高优)</option>
+                                                <option value="P1 - 高优" className="text-orange-600">P1 - 高优</option>
+                                                <option value="P2 - 正常" className="text-slate-700">P2 - 正常</option>
+                                                <option value="P3 - 暂缓" className="text-slate-400">P3 - 暂缓</option>
                                             </select>
                                         </div>
                                     </div>
@@ -1192,10 +1198,10 @@
                                         <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" placeholder="如：Finn, Lydia" disabled={saving} /></div>
                                     </div>
                                     
-                                    <div className="mt-2 p-3 bg-violet-50/50 border border-violet-200 rounded-xl">
+                                    <div className="mt-2 p-3 bg-rose-50/50 border border-rose-200 rounded-xl">
                                         <label className="flex items-center cursor-pointer select-none">
-                                            <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-violet-600 rounded border-violet-300 focus:ring-violet-500 cursor-pointer" disabled={saving} />
-                                            <span className="ml-2 text-[14px] font-bold text-violet-700">👀 遇到卡点，需要老板批示/过目 <span className="text-xs font-normal text-violet-500 ml-1">(勾选后将显示在看板的专属首列中)</span></span>
+                                            <input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} />
+                                            <span className="ml-2 text-[14px] font-bold text-rose-700">标记为 Need attention (需优先关注) <span className="text-xs font-normal text-rose-500 ml-1">(勾选后将显示在看板的专属首列中)</span></span>
                                         </label>
                                     </div>
                                 </form>
@@ -1219,7 +1225,7 @@
                             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col border border-slate-200/50">
                                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
                                     <h2 className="text-lg font-bold text-slate-800">批量导入数据</h2>
-                                    <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><Icons.Alert style={{display:'none'}}/><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                    <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
                                 <div className="p-6">
                                     <div className="mb-4 bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
