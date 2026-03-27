@@ -10,21 +10,24 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     * { box-sizing: border-box; }
-    html, body, #root { min-height: 100%; }
+    /* 解锁全局滚动，允许内部容器接管滑动 */
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #root { height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+    
     body {
-      margin: 0;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background:
         radial-gradient(circle at top left, rgba(99, 102, 241, 0.14), transparent 28%),
         radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 24%),
         linear-gradient(180deg, #f8fbff 0%, #f4f7fb 42%, #eef3f9 100%);
       color: #1e293b;
-      overflow-x: hidden;
-      overflow-y: auto;
+      overflow: hidden; /* 锁定 body 滚动，由内部的 main 标签实现丝滑的四向滑动 */
     }
+    
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
     .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0; }
+    
     .glass-header {
       background: rgba(255,255,255,.78);
       backdrop-filter: blur(16px);
@@ -395,20 +398,24 @@
               {columns.map(status => {
                 const config = COLUMN_CONFIG[status];
                 const colTasks = sortTasks(catTasks.filter(t => {
-                const key = getBoardColumnKey(t);
-                if (status === 'Need Attention') return key === 'Need Attention' || key === 'To Do';
-                return key === status;
-              }));
+                  const key = getBoardColumnKey(t);
+                  if (status === 'Need Attention') return key === 'Need Attention' || key === 'To Do';
+                  return key === status;
+                }));
                 const dropKey = `${catName}-${status}`;
                 const isDragOver = draggedOverCol === dropKey;
                 const dropDisabled = status === 'Overdue';
+                
+                // 给进行中列动态分配更大的宽度
+                const widthClass = status === 'In progress' ? 'flex-1 min-w-[400px]' : 'w-[260px] shrink-0';
+
                 return (
                   <div
                     key={dropKey}
                     onDragOver={dropDisabled ? undefined : (e) => onDragOver(e, dropKey)}
                     onDragLeave={dropDisabled ? undefined : onDragLeave}
                     onDrop={dropDisabled ? undefined : (e) => onDrop(e, status, catName)}
-                    className={`flex-shrink-0 ${status === 'In progress' ? 'w-[560px]' : 'w-[220px]'} flex flex-col rounded-2xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
+                    className={`${widthClass} flex flex-col rounded-2xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
                   >
                     <div className={`px-3 py-2.5 flex justify-between items-center border-b border-slate-100/50 ${config.headerBg}`}>
                       <h3 className={`font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}`}>{config.icon}<span>{config.title}</span></h3>
@@ -555,7 +562,7 @@
                   <td className="px-4 py-3 text-slate-600">{task.assignee || '未分配'}</td>
                   <td className="px-4 py-3 text-slate-600">{task.startDate || '-'}</td>
                   <td className="px-4 py-3 text-slate-600">{task.dueDate || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600">{formatDateTime(task.updatedAt)}</td>
+                  <td className="px-4 py-3 text-slate-600 text-[12px]">{formatDateTime(task.updatedAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -761,7 +768,7 @@
         { label: '已逾期', value: summary.overdue, status: 'Overdue', accent: 'text-red-600' }
       ];
 
-      const renderColumnSection = (status, compact = false, taskSource = null, fillHeight = false, fixedHeight = false) => {
+      const renderColumnSection = (status, compact = false, taskSource = null) => {
         const config = COLUMN_CONFIG[status];
         const columnTasks = taskSource || filteredTasks.filter(task => getBoardColumnKey(task) === status);
         const groupCategories = [...new Set(columnTasks.map(t => t.category || '未分类'))].sort();
@@ -773,9 +780,9 @@
             onDragOver={dropDisabled ? undefined : (e) => { e.preventDefault(); setDraggedOverCol(status); }}
             onDragLeave={dropDisabled ? undefined : () => setDraggedOverCol(null)}
             onDrop={dropDisabled ? undefined : (e) => handleDrop(e, status)}
-            className={`kanban-column-shell rounded-3xl border ${config.borderColor} p-3.5 flex flex-col ${compact ? 'min-h-[180px]' : 'min-h-[500px]'} ${fixedHeight ? 'h-[500px]' : ''} ${fillHeight ? 'flex-1 min-h-0' : ''} ${isDragOver ? 'drag-over' : ''}`}
+            className={`kanban-column-shell rounded-3xl border ${config.borderColor} p-3.5 flex flex-col flex-1 min-h-0 ${isDragOver ? 'drag-over' : ''}`}
           >
-            <div className={`rounded-2xl ${config.headerBg} px-4 py-3 flex items-center justify-between mb-4`}>
+            <div className={`rounded-2xl ${config.headerBg} px-4 py-3 flex items-center justify-between mb-4 shrink-0`}>
               <div className={`flex items-center gap-2 font-bold ${config.text}`}>
                 {config.icon}
                 <span>{config.title}</span>
@@ -783,11 +790,11 @@
               <span className="text-sm font-semibold text-slate-500">{columnTasks.length}</span>
             </div>
             {status === 'Overdue' && (
-              <div className="text-[11px] text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-3">
+              <div className="text-[11px] text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-3 shrink-0">
                 到期未完成的项目会自动显示在这里；确认完成后再手动调整为“已完成”。
               </div>
             )}
-            <div className="space-y-3 custom-scrollbar overflow-auto pr-1 flex-1">
+            <div className="space-y-3 custom-scrollbar overflow-y-auto overflow-x-hidden pr-1 flex-1 min-h-0">
               {columnTasks.length === 0 ? (
                 <div className="h-40 rounded-2xl border border-dashed border-slate-200 bg-white/70 flex flex-col items-center justify-center text-center px-4">
                   <Icons.EmptyBox />
@@ -812,13 +819,12 @@
       }
 
       return (
-        <div className="flex flex-col min-h-screen lg:h-screen overflow-hidden">
-          <header className="glass-header border-b border-white/60 px-4 md:px-5 py-3 shrink-0 z-20">
-            <div className="max-w-[1700px] mx-auto space-y-3">
+        <div className="flex flex-col h-screen w-full overflow-hidden bg-transparent">
+          <header className="glass-header border-b border-white/60 shrink-0 z-20 overflow-x-auto custom-scrollbar">
+            <div className="min-w-[1200px] max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
               <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
-                  
                 </div>
                 <div className="flex flex-wrap gap-3 items-center">
                   <div className="flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner">
@@ -851,21 +857,38 @@
                 })}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
-                <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex items-center gap-3 2xl:col-span-1"><Icons.Search /><input value={filters.search} onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="搜索事项、负责人、进展..." className="w-full bg-transparent outline-none text-sm" /></div>
-                <div className="panel-glass rounded-2xl px-3.5 py-2.5"><select value={filters.category} onChange={(e) => setFilters(f => ({ ...f, category: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700"><option value="All">全部板块</option>{categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                <div className="panel-glass rounded-2xl px-3.5 py-2.5"><select value={filters.assignee} onChange={(e) => setFilters(f => ({ ...f, assignee: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700"><option value="All">全部负责人</option>{assignees.filter(a => a !== 'All').map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-                <div className="panel-glass rounded-2xl px-3.5 py-2.5"><select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">{statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部状态' : getStatusTitle(s)}</option>)}</select></div>
+              <div className="flex overflow-x-auto custom-scrollbar gap-3 items-center pb-2">
+                <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex items-center gap-3 flex-shrink-0 min-w-[240px]">
+                  <Icons.Search />
+                  <input value={filters.search} onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="搜索事项、负责人、进展..." className="w-full bg-transparent outline-none text-sm" />
+                </div>
+                <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]">
+                  <select value={filters.category} onChange={(e) => setFilters(f => ({ ...f, category: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">
+                    <option value="All">全部板块</option>
+                    {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]">
+                  <select value={filters.assignee} onChange={(e) => setFilters(f => ({ ...f, assignee: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">
+                    <option value="All">全部负责人</option>
+                    {assignees.filter(a => a !== 'All').map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]">
+                  <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">
+                    {statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部状态' : getStatusTitle(s)}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto px-4 md:px-6 py-6 board-main">
-            <div className="max-w-[1700px] mx-auto relative z-10">
+          <main className="flex-1 overflow-auto custom-scrollbar px-4 md:px-6 py-6 board-main">
+            <div className="min-w-[1280px] max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
               {filters.view === 'kanban' && (
-                <>
-                  <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-stretch">
-                    <div className="xl:col-span-3">
+                <div className="flex flex-col h-full">
+                  <div className="flex gap-5 items-stretch h-[75vh] min-h-[600px]">
+                    <div className="w-[320px] shrink-0 flex flex-col">
                       {renderColumnSection(
                         'Need Attention',
                         false,
@@ -875,21 +898,22 @@
                         })
                       )}
                     </div>
-                    <div className="xl:col-span-6">
-                      {renderColumnSection('In progress', false, null, false, true)}
+                    <div className="flex-1 min-w-[400px] flex flex-col">
+                      {renderColumnSection('In progress')}
                     </div>
-                    <div className="xl:col-span-3 flex flex-col gap-5 h-full">
-                      {renderColumnSection('Overdue', true, null, true)}
-                      {renderColumnSection('Pending', true, null, true)}
+                    <div className="w-[320px] shrink-0 flex flex-col gap-5">
+                      {renderColumnSection('Overdue')}
+                      {renderColumnSection('Pending')}
                     </div>
                   </div>
-
-                  <CompletedArchivePanel tasks={completedArchiveTasks} onEdit={setEditingTask} />
-                </>
+                  <div className="mt-5">
+                     <CompletedArchivePanel tasks={completedArchiveTasks} onEdit={setEditingTask} />
+                  </div>
+                </div>
               )}
 
               {filters.view === 'swimlane' && (
-                <div>
+                <div className="pb-10">
                   {categories.filter(c => c !== 'All').length === 0 ? (
                     <div className="panel-glass rounded-2xl p-16 text-center text-slate-400">暂无板块数据</div>
                   ) : categories.filter(c => c !== 'All').map(cat => {
@@ -922,13 +946,13 @@
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)} ({option})</option>)}</select></div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option><option value="P3 - 暂缓">P3 - 暂缓</option></select></div>
+                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
+                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
                   </div>
                   <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="3" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
                   <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail || ''} rows="2" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
                   <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
-                  <div className="mt-2 p-3 bg-rose-50/50 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
+                  <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
                 </form>
                 <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
                   {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
