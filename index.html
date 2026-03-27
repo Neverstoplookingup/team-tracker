@@ -24,7 +24,7 @@
     }
     
     /* 优化全局与局部滚动条，开启 iOS 原生动量滚动 */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
     .custom-scrollbar { 
         scrollbar-width: thin; 
@@ -148,7 +148,6 @@
 
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userConfig;
     
-    // 全局 Try-Catch 保护：防止移动端因浏览器隐私限制抛出底层错误导致整个系统白屏崩溃
     try {
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
@@ -196,7 +195,6 @@
     const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
     const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
 
-    // 去除代码硬编码的假数据，确保用户始终看到真实的云端或自己创建的数据
     const DEFAULT_TASKS = [];
 
     const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -247,7 +245,6 @@
       return value.trim();
     };
     
-    // 安全获取状态名称，防止因脏数据导致的崩溃
     const getStatusTitle = (statusKey) => COLUMN_CONFIG[statusKey]?.title || statusKey || '未知状态';
     
     const sortTasks = (tasksList) => [...tasksList].sort((a, b) => {
@@ -413,7 +410,7 @@
             </div>
           </button>
           <div className={`swimlane-content bg-slate-50/50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}`}>
-            <div className="flex overflow-x-auto custom-scrollbar p-4 space-x-4 min-h-[220px]">
+            <div className="flex overflow-x-auto custom-scrollbar p-4 space-x-4 min-h-[220px] snap-x snap-mandatory">
               {columns.map(status => {
                 const config = COLUMN_CONFIG[status];
                 const colTasks = sortTasks(catTasks.filter(t => {
@@ -425,8 +422,8 @@
                 const isDragOver = draggedOverCol === dropKey;
                 const dropDisabled = status === 'Overdue';
                 
-                // 给进行中列动态分配更大的宽度
-                const widthClass = status === 'In progress' ? 'flex-1 min-w-[400px]' : 'w-[260px] shrink-0';
+                // 给进行中列动态分配更大的宽度，移动端适配原生滚动
+                const widthClass = status === 'In progress' ? 'w-[85vw] md:flex-1 md:min-w-[320px] lg:min-w-[400px] shrink-0 snap-center' : 'w-[80vw] md:w-[260px] shrink-0 snap-center';
 
                 return (
                   <div
@@ -602,24 +599,20 @@
       const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
       const getDocRef = (taskId) => window.FB && window.FB.db ? window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId) : null;
 
-      // 强制鉴权穿透机制：解决手机浏览器静默拦截导致 Auth 卡死，从而一直显示 0 条数据的 Bug
       useEffect(() => {
         let isMounted = true;
         let authUnsub = null;
 
         const initAuthAndListen = async () => {
           if (!window.FB?.auth) {
-            // Firebase script completely failed to load or init
             if (isMounted) setUser({ uid: 'mobile-bypass-user' });
             return;
           }
           
-          // 1. 注册监听器
           authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
             if (isMounted && u) setUser(u);
           });
 
-          // 2. 触发登录（加入 1.5 秒超时控制）
           try {
             const loginPromise = (typeof __initial_auth_token !== 'undefined' && __initial_auth_token)
               ? window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token)
@@ -629,7 +622,6 @@
             
             const result = await Promise.race([loginPromise, timeoutPromise]);
             
-            // 如果手机端静默拦截，触发超时强制分配一个访客身份去拉取数据
             if (result === 'TIMEOUT' && isMounted) {
               console.warn('Auth blocked on mobile. Forcing bypass...');
               setUser(prev => prev || { uid: 'mobile-bypass-user' });
@@ -706,12 +698,13 @@
 
       const completedArchiveTasks = useMemo(() => sortTasks(filteredTasks.filter(t => getBoardColumnKey(t) === 'Done')), [filteredTasks]);
 
+      // 这里修改默认状态为 'In progress'，在点击新增的时候就会跳过 'To Do'
       const openNewTask = () => setEditingTask({
         category: filters.category !== 'All' ? filters.category : '',
         task: '',
         detail: '',
         progress: '',
-        status: 'To Do',
+        status: 'In progress', 
         priority: 'P2 - 正常',
         isUrgent: false,
         assignee: '',
@@ -785,7 +778,6 @@
         const targetTask = tasks.find(t => t.id === taskId);
         if (!targetTask) return;
         
-        // 拖入“需过目”列：仅仅打上 isUrgent 标记，不破坏其原有的底层 status
         let newStatus = targetTask.status;
         let newIsUrgent = targetTask.isUrgent;
         
@@ -882,13 +874,14 @@
 
       return (
         <div className="flex flex-col h-screen w-full overflow-hidden bg-transparent">
-          <header className="glass-header border-b border-white/60 shrink-0 z-20 overflow-x-auto custom-scrollbar">
-            <div className="min-w-[1200px] max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
-              <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
+          {/* 取消了 header 级别的强行 min-w 限制 */}
+          <header className="glass-header border-b border-white/60 shrink-0 z-20">
+            <div className="w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
                 </div>
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-wrap gap-2 md:gap-3 items-center">
                   <div className="flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner">
                     {viewOptions.map(v => (
                       <button key={v.id} onClick={() => setFilters(f => ({ ...f, view: v.id }))} className={`px-3.5 py-1.5 text-[12px] font-medium rounded-xl transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
@@ -900,14 +893,15 @@
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+              {/* 移动端水平滚动，PC 端依然保持网格 */}
+              <div className="flex overflow-x-auto md:grid md:grid-cols-3 xl:grid-cols-5 gap-3 pb-2 custom-scrollbar snap-x">
                 {summaryCards.map(card => {
                   const active = filters.status === card.status;
                   return (
                     <button
                       key={card.label}
                       onClick={() => setFilters(f => ({ ...f, status: active ? 'All' : card.status }))}
-                      className={`summary-card summary-card-btn rounded-2xl p-3 ${active ? 'active' : ''}`}
+                      className={`summary-card summary-card-btn rounded-2xl p-3 shrink-0 min-w-[140px] md:min-w-0 snap-start ${active ? 'active' : ''}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs text-slate-500">{card.label}</div>
@@ -919,7 +913,7 @@
                 })}
               </div>
 
-              <div className="flex overflow-x-auto custom-scrollbar gap-3 items-center pb-2">
+              <div className="flex overflow-x-auto custom-scrollbar gap-2 md:gap-3 items-center pb-2">
                 <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex items-center gap-3 flex-shrink-0 min-w-[240px]">
                   <Icons.Search />
                   <input value={filters.search} onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="搜索事项、负责人、进展..." className="w-full bg-transparent outline-none text-sm" />
@@ -946,11 +940,13 @@
           </header>
 
           <main className="flex-1 overflow-auto custom-scrollbar px-4 md:px-6 py-6 board-main">
-            <div className="min-w-[1280px] max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
+            {/* 取消了 main 级别的强行 min-w 限制 */}
+            <div className="w-full max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
               {filters.view === 'kanban' && (
                 <div className="flex flex-col h-full">
-                  <div className="flex gap-5 items-stretch h-[75vh] min-h-[600px]">
-                    <div className="w-[320px] shrink-0 flex flex-col">
+                  {/* 针对手机屏幕允许左右滚动滑动 */}
+                  <div className="flex gap-4 md:gap-5 items-stretch h-[75vh] min-h-[500px] md:min-h-[600px] overflow-x-auto custom-scrollbar pb-4 snap-x snap-mandatory">
+                    <div className="w-[85vw] max-w-[320px] md:max-w-none md:w-[320px] shrink-0 flex flex-col snap-center">
                       {renderColumnSection(
                         'Need Attention',
                         false,
@@ -960,10 +956,10 @@
                         })
                       )}
                     </div>
-                    <div className="flex-1 min-w-[400px] flex flex-col">
+                    <div className="w-[85vw] max-w-[400px] md:max-w-none md:flex-1 md:min-w-[320px] lg:min-w-[400px] shrink-0 flex flex-col snap-center">
                       {renderColumnSection('In progress')}
                     </div>
-                    <div className="w-[320px] shrink-0 flex flex-col gap-5">
+                    <div className="w-[85vw] max-w-[320px] md:max-w-none md:w-[320px] shrink-0 flex flex-col gap-4 md:gap-5 snap-center">
                       {renderColumnSection('Overdue')}
                       {renderColumnSection('Pending')}
                     </div>
@@ -993,22 +989,28 @@
           </main>
 
           {editingTask && (
-            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 modal-overlay">
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 md:p-6 modal-overlay">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200/50 modal-content">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                <div className="px-5 md:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
                   <h2 className="text-lg font-bold text-slate-800">{editingTask.id ? '编辑事项' : '新增事项'}</h2>
                   <button onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                 </div>
-                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6 space-y-5 md:space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                     <div className="md:col-span-2"><label className="block text-[14px] font-semibold text-slate-600 mb-2">事项标题</label><input name="task" defaultValue={editingTask.task || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} required /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label><input name="category" defaultValue={editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                    <div>
+                      <label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label>
+                      {/* 如果是新增事项(!editingTask.id)，则通过 filter 屏蔽掉 To Do 选项 */}
+                      <select name="status" defaultValue={editingTask.status || 'In progress'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
+                        {EDITABLE_STATUS_OPTIONS.filter(opt => editingTask.id || opt !== 'To Do').map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}
+                      </select>
+                    </div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">优先级</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
                   </div>
                   <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="3" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
@@ -1016,7 +1018,7 @@
                   <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
                   <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
                 </form>
-                <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
+                <div className="px-5 md:px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
                   {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
                   <div className="flex space-x-3">
                     <button type="button" onClick={() => setEditingTask(null)} disabled={saving} className="px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
