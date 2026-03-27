@@ -177,12 +177,6 @@
     const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
     const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
 
-    const DEFAULT_TASKS = [
-      { id: 'demo-1', category: '官网项目', task: 'HC 官网首页改版', detail: '保留原导航逻辑，优化视觉层级。', progress: '已完成首屏和案例区设计稿，待过目。', status: 'In progress', priority: 'P1 - 优先', isUrgent: true, assignee: 'FeiFei', startDate: '2026-03-20', dueDate: '2026-03-29', attachmentUrl: '', updatedAt: Date.now() - 3600 * 1000, createdAt: Date.now() - 5 * 24 * 3600 * 1000 },
-      { id: 'demo-2', category: '提案项目', task: 'Orbiva 提案整理', detail: '更新价格页与案例顺序。', progress: '提案初稿已完成，需要管理层确认。', status: 'To Do', priority: 'P0 - 紧急', isUrgent: false, assignee: 'HC 团队', startDate: '2026-03-22', dueDate: '2026-03-28', attachmentUrl: '', updatedAt: Date.now() - 3 * 3600 * 1000, createdAt: Date.now() - 4 * 24 * 3600 * 1000 },
-      { id: 'demo-3', category: '运营支持', task: '客户跟进表同步', detail: '按负责人重新分配。', progress: '全部同步完成。', status: 'Done', priority: 'P2 - 正常', isUrgent: false, assignee: '运营', startDate: '2026-03-18', dueDate: '2026-03-24', attachmentUrl: '', updatedAt: Date.now() - 5 * 3600 * 1000, createdAt: Date.now() - 8 * 24 * 3600 * 1000 }
-    ];
-
     const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const getCreatedAt = (task) => task?.createdAt || task?.updatedAt || Date.now();
     const parseDateOnly = (dateStr) => {
@@ -326,7 +320,7 @@
               <div className="flex flex-wrap gap-1.5 mt-2">
                 <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">{sortedTasks.length} 项</span>
                 {inProgressCount > 0 && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold">推进中 {inProgressCount}</span>}
-                {urgentCount > 0 && <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded font-semibold">待过目 {urgentCount}</span>}
+                {urgentCount > 0 && <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded font-semibold">需过目 {urgentCount}</span>}
                 {overdueCount > 0 && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded font-semibold">逾期 {overdueCount}</span>}
               </div>
             </div>
@@ -572,7 +566,7 @@
     };
 
     function App() {
-      const [tasks, setTasks] = useState(DEFAULT_TASKS);
+      const [tasks, setTasks] = useState([]);
       const [user, setUser] = useState(null);
       const [loading, setLoading] = useState(true);
       const [saving, setSaving] = useState(false);
@@ -594,13 +588,16 @@
             }
           } catch (e) {
             console.error('Auth failed:', e);
+            setUser({ uid: 'anonymous-fallback' });
             setLoading(false);
           }
         };
         const setup = () => {
           if (!window.FB?.auth) return;
           init();
-          return window.FB.onAuthStateChanged(window.FB.auth, setUser);
+          return window.FB.onAuthStateChanged(window.FB.auth, (u) => {
+              if (u) setUser(u);
+          });
         };
         let unsub = null;
         if (window.FB) unsub = setup();
@@ -617,7 +614,7 @@
             const data = docSnap.data() || {};
             fetchedTasks.push({ id: docSnap.id, ...data });
           });
-          setTasks(fetchedTasks.length ? fetchedTasks : DEFAULT_TASKS);
+          setTasks(fetchedTasks);
           setLoading(false);
         }, (err) => {
           console.error('Firestore sync error:', err);
@@ -946,13 +943,13 @@
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
+                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)} ({option})</option>)}</select></div>
+                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">紧急度</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option><option value="P3 - 暂缓">P3 - 暂缓</option></select></div>
                   </div>
                   <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="3" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
                   <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail || ''} rows="2" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
                   <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
-                  <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
+                  <div className="mt-2 p-3 bg-rose-50/50 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
                 </form>
                 <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
                   {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
