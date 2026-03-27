@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>团队协作工作台</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -10,9 +10,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     * { box-sizing: border-box; }
-    /* 解锁全局滚动，允许内部容器接管滑动 */
-    html, body { height: 100%; margin: 0; padding: 0; }
-    #root { height: 100vh; width: 100vw; display: flex; flex-direction: column; }
+    /* 彻底修复移动端滚动卡死问题：锁定视口，利用内部 Flex 容器实现原生丝滑滑动 */
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; touch-action: pan-x pan-y; }
+    #root { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
     
     body {
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -21,12 +21,16 @@
         radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 24%),
         linear-gradient(180deg, #f8fbff 0%, #f4f7fb 42%, #eef3f9 100%);
       color: #1e293b;
-      overflow: hidden; /* 锁定 body 滚动，由内部的 main 标签实现丝滑的四向滑动 */
     }
     
+    /* 优化全局与局部滚动条，开启 iOS 原生动量滚动 */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-    .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #94a3b8 #e2e8f0; }
+    .custom-scrollbar { 
+        scrollbar-width: thin; 
+        scrollbar-color: #94a3b8 transparent; 
+        -webkit-overflow-scrolling: touch; 
+    }
     
     .glass-header {
       background: rgba(255,255,255,.78);
@@ -93,6 +97,7 @@
         linear-gradient(rgba(255,255,255,.45) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,.45) 1px, transparent 1px);
       background-size: 34px 34px;
+      -webkit-mask-image: linear-gradient(180deg, rgba(255,255,255,.22), transparent 88%);
       mask-image: linear-gradient(180deg, rgba(255,255,255,.22), transparent 88%);
     }
     .smooth-transition { transition: all .28s cubic-bezier(.4,0,.2,1); }
@@ -115,6 +120,12 @@
       box-shadow: inset 0 0 0 1px rgba(251,113,133,.16);
     }
     .dragging { opacity: .4; transform: scale(.98); }
+    
+    /* 弹窗动画 */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .modal-overlay { animation: fadeIn 0.2s ease-out forwards; }
+    .modal-content { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   </style>
 </head>
 <body>
@@ -136,15 +147,23 @@
     };
 
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userConfig;
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    
+    // 全局 Try-Catch 保护：防止移动端因浏览器隐私限制抛出底层错误导致整个系统白屏崩溃
+    try {
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
 
-    window.FB = {
-      auth, db, doc, collection, setDoc, deleteDoc, updateDoc, onSnapshot,
-      signInAnonymously, signInWithCustomToken, onAuthStateChanged
-    };
-    window.dispatchEvent(new Event('firebase-loaded'));
+      window.FB = {
+        auth, db, doc, collection, setDoc, deleteDoc, updateDoc, onSnapshot,
+        signInAnonymously, signInWithCustomToken, onAuthStateChanged
+      };
+    } catch (error) {
+      console.warn("Firebase 初始化受限，已自动降级为本地运行模式:", error);
+      window.FB = null; 
+    } finally {
+      window.dispatchEvent(new Event('firebase-loaded'));
+    }
   </script>
 
   <script type="text/babel">
@@ -176,6 +195,9 @@
     const EDITABLE_STATUS_OPTIONS = ['To Do', 'In progress', 'Pending', 'Done'];
     const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
     const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
+
+    // 去除代码硬编码的假数据，确保用户始终看到真实的云端或自己创建的数据
+    const DEFAULT_TASKS = [];
 
     const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     const getCreatedAt = (task) => task?.createdAt || task?.updatedAt || Date.now();
@@ -225,7 +247,7 @@
       return value.trim();
     };
     
-    // 增加容错，避免任何由于历史脏数据导致的崩溃
+    // 安全获取状态名称，防止因脏数据导致的崩溃
     const getStatusTitle = (statusKey) => COLUMN_CONFIG[statusKey]?.title || statusKey || '未知状态';
     
     const sortTasks = (tasksList) => [...tasksList].sort((a, b) => {
@@ -569,7 +591,7 @@
     };
 
     function App() {
-      const [tasks, setTasks] = useState([]);
+      const [tasks, setTasks] = useState(DEFAULT_TASKS);
       const [user, setUser] = useState(null);
       const [loading, setLoading] = useState(true);
       const [saving, setSaving] = useState(false);
@@ -578,7 +600,7 @@
       const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
 
       const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
-      const getDocRef = (taskId) => window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId);
+      const getDocRef = (taskId) => window.FB && window.FB.db ? window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId) : null;
 
       // 强制鉴权穿透机制：解决手机浏览器静默拦截导致 Auth 卡死，从而一直显示 0 条数据的 Bug
       useEffect(() => {
@@ -586,7 +608,11 @@
         let authUnsub = null;
 
         const initAuthAndListen = async () => {
-          if (!window.FB?.auth) return;
+          if (!window.FB?.auth) {
+            // Firebase script completely failed to load or init
+            if (isMounted) setUser({ uid: 'mobile-bypass-user' });
+            return;
+          }
           
           // 1. 注册监听器
           authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
@@ -638,7 +664,7 @@
             const data = docSnap.data() || {};
             fetchedTasks.push({ id: docSnap.id, ...data });
           });
-          setTasks(fetchedTasks);
+          setTasks(fetchedTasks.length ? fetchedTasks : DEFAULT_TASKS);
           setLoading(false);
         }, (err) => {
           console.error('Firestore sync error:', err);
@@ -698,11 +724,6 @@
         e.preventDefault();
         const formData = new FormData(e.target);
         const taskId = editingTask?.id || generateId();
-        
-        let sDate = formData.get('startDate');
-        let eDate = formData.get('dueDate');
-        if (sDate && eDate && new Date(eDate) < new Date(sDate)) eDate = sDate;
-
         const taskData = {
           id: taskId,
           category: normalizeCategory(formData.get('category')),
@@ -713,20 +734,20 @@
           priority: String(formData.get('priority') || 'P2 - 正常'),
           isUrgent: formData.get('isUrgent') === 'on',
           assignee: String(formData.get('assignee') || '').trim(),
-          startDate: sDate || '',
-          dueDate: eDate || '',
+          startDate: String(formData.get('startDate') || '').trim(),
+          dueDate: String(formData.get('dueDate') || '').trim(),
           attachmentUrl: String(formData.get('attachmentUrl') || '').trim(),
           updatedAt: Date.now(),
           createdAt: editingTask?.createdAt || Date.now()
         };
-        
         if (!taskData.task) return;
         setSaving(true);
         const prevTasks = tasks;
         const nextTasks = editingTask?.id ? tasks.map(t => t.id === taskId ? taskData : t) : [taskData, ...tasks];
         setTasks(nextTasks);
         try {
-          if (window.FB?.setDoc && window.FB?.db) await window.FB.setDoc(getDocRef(taskId), taskData);
+          const docRef = getDocRef(taskId);
+          if (window.FB?.setDoc && window.FB?.db && docRef) await window.FB.setDoc(docRef, taskData);
           setEditingTask(null);
         } catch (err) {
           console.error(err);
@@ -743,7 +764,8 @@
         setSaving(true);
         setTasks(tasks.filter(t => t.id !== editingTask.id));
         try {
-          if (window.FB?.deleteDoc && window.FB?.db) await window.FB.deleteDoc(getDocRef(editingTask.id));
+          const docRef = getDocRef(editingTask.id);
+          if (window.FB?.deleteDoc && window.FB?.db && docRef) await window.FB.deleteDoc(docRef);
           setEditingTask(null);
         } catch (err) {
           console.error(err);
@@ -754,7 +776,6 @@
         }
       };
 
-      // 拖拽逻辑：仅改变是否被标记为“需过目”，不破坏原有底层业务状态
       const handleDrop = async (e, targetStatus, newCategory = null) => {
         e.preventDefault();
         setDraggedOverCol(null);
@@ -763,22 +784,30 @@
         if (!taskId) return;
         const targetTask = tasks.find(t => t.id === taskId);
         if (!targetTask) return;
-
-        const updatedFields = { updatedAt: Date.now() };
-        if (newCategory) updatedFields.category = newCategory;
-
+        
+        // 拖入“需过目”列：仅仅打上 isUrgent 标记，不破坏其原有的底层 status
+        let newStatus = targetTask.status;
+        let newIsUrgent = targetTask.isUrgent;
+        
         if (targetStatus === 'Need Attention') {
-            updatedFields.isUrgent = true;
+            newIsUrgent = true;
         } else {
-            updatedFields.status = targetStatus;
-            updatedFields.isUrgent = false;
+            newStatus = targetStatus;
+            newIsUrgent = false;
         }
 
+        const updatedFields = {
+          status: newStatus,
+          isUrgent: newIsUrgent,
+          updatedAt: Date.now(),
+          ...(newCategory ? { category: newCategory } : {})
+        };
         const prevTasks = tasks;
         const nextTasks = tasks.map(t => t.id === taskId ? { ...t, ...updatedFields } : t);
         setTasks(nextTasks);
         try {
-          if (window.FB?.updateDoc && window.FB?.db) await window.FB.updateDoc(getDocRef(taskId), updatedFields);
+          const docRef = getDocRef(taskId);
+          if (window.FB?.updateDoc && window.FB?.db && docRef) await window.FB.updateDoc(docRef, updatedFields);
         } catch (err) {
           console.error(err);
           setTasks(prevTasks);
@@ -964,8 +993,8 @@
           </main>
 
           {editingTask && (
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200/50">
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 modal-overlay">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200/50 modal-content">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
                   <h2 className="text-lg font-bold text-slate-800">{editingTask.id ? '编辑事项' : '新增事项'}</h2>
                   <button onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
