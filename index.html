@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     /* 彻底修复移动端滚动卡死问题：锁定视口，利用内部 Flex 容器实现原生丝滑滑动 */
@@ -24,7 +25,7 @@
     }
     
     /* 优化全局与局部滚动条，开启 iOS 原生动量滚动 */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
     .custom-scrollbar { 
         scrollbar-width: thin; 
@@ -131,39 +132,129 @@
 <body>
   <div id="root"></div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  <script>
+  window.FB = undefined;
+  window.__fbInitError = null;
+  window.__fbInitMode = null;
 
-    const userConfig = {
-      apiKey: "AIzaSyDyfETIW3f_mqphx7w2eErR_Z4w-EUWsZg",
-      authDomain: "kanban-a8614.firebaseapp.com",
-      projectId: "kanban-a8614",
-      storageBucket: "kanban-a8614.firebasestorage.app",
-      messagingSenderId: "42784160848",
-      appId: "1:42784160848:web:12d40daec006adad1ea555",
-      measurementId: "G-J9014LF5NG"
+  const userConfig = {
+    apiKey: "AIzaSyDyfETIW3f_mqphx7w2eErR_Z4w-EUWsZg",
+    authDomain: "kanban-a8614.firebaseapp.com",
+    projectId: "kanban-a8614",
+    storageBucket: "kanban-a8614.firebasestorage.app",
+    messagingSenderId: "42784160848",
+    appId: "1:42784160848:web:12d40daec006adad1ea555",
+    measurementId: "G-J9014LF5NG"
+  };
+
+  const firebaseConfig = typeof __firebase_config !== 'undefined'
+    ? JSON.parse(__firebase_config)
+    : userConfig;
+
+  const FB_SDK_VERSION = '12.11.0';
+
+  function dispatchFirebaseLoaded() {
+    window.dispatchEvent(new Event('firebase-loaded'));
+  }
+
+  function createScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = () => resolve(src);
+      s.onerror = () => reject(new Error('Script load failed: ' + src));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function initFirebaseWithCompat() {
+    await createScript(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-app-compat.js`);
+    await createScript(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-auth-compat.js`);
+    await createScript(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-firestore-compat.js`);
+
+    if (!window.firebase) {
+      throw new Error('Compat SDK loaded but window.firebase is missing');
+    }
+
+    if (!window.firebase.apps.length) {
+      window.firebase.initializeApp(firebaseConfig);
+    }
+
+    const auth = window.firebase.auth();
+    const db = window.firebase.firestore();
+
+    window.FB = {
+      auth,
+      db,
+      doc: (...segments) => db.doc(segments.join('/')),
+      collection: (...segments) => db.collection(segments.join('/')),
+      setDoc: (ref, data) => ref.set(data),
+      deleteDoc: (ref) => ref.delete(),
+      updateDoc: (ref, data) => ref.update(data),
+      onSnapshot: (ref, next, error) => ref.onSnapshot(next, error),
+      signInAnonymously: (authInstance) => authInstance.signInAnonymously(),
+      signInWithCustomToken: (authInstance, token) => authInstance.signInWithCustomToken(token),
+      onAuthStateChanged: (authInstance, cb) => authInstance.onAuthStateChanged(cb)
     };
 
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userConfig;
-    
-    try {
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const db = getFirestore(app);
+    window.__fbInitMode = 'compat';
+    console.log('Firebase init success via compat SDK');
+  }
 
-      window.FB = {
-        auth, db, doc, collection, setDoc, deleteDoc, updateDoc, onSnapshot,
-        signInAnonymously, signInWithCustomToken, onAuthStateChanged
-      };
-    } catch (error) {
-      console.warn("Firebase 初始化受限，已自动降级为本地运行模式:", error);
-      window.FB = null; 
+  async function initFirebaseWithModule() {
+    const [appMod, authMod, fsMod] = await Promise.all([
+      import(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-app.js`),
+      import(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-auth.js`),
+      import(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-firestore.js`)
+    ]);
+
+    const { initializeApp } = appMod;
+    const { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = authMod;
+    const { getFirestore, collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot } = fsMod;
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    window.FB = {
+      auth,
+      db,
+      doc,
+      collection,
+      setDoc,
+      deleteDoc,
+      updateDoc,
+      onSnapshot,
+      signInAnonymously,
+      signInWithCustomToken,
+      onAuthStateChanged
+    };
+
+    window.__fbInitMode = 'module';
+    console.log('Firebase init success via module SDK');
+  }
+
+  (async () => {
+    try {
+      await initFirebaseWithModule();
+    } catch (moduleError) {
+      console.warn('Module SDK failed, trying compat fallback...', moduleError);
+      try {
+        await initFirebaseWithCompat();
+      } catch (compatError) {
+        window.__fbInitError = compatError;
+        window.FB = null;
+        console.error('Firebase module + compat init both failed:', {
+          moduleError,
+          compatError
+        });
+      }
     } finally {
-      window.dispatchEvent(new Event('firebase-loaded'));
+      dispatchFirebaseLoaded();
     }
-  </script>
+  })();
+</script>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
@@ -178,6 +269,7 @@
       Search: () => <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
       Link: () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
       Edit: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+      Download: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M7 10l5 5m0 0l5-5m-5 5V4" /></svg>,
       EmptyBox: () => <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
     };
 
@@ -195,6 +287,7 @@
     const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
     const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
 
+    // 去除代码硬编码的假数据，确保用户始终看到真实的云端或自己创建的数据
     const DEFAULT_TASKS = [];
 
     const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -245,6 +338,7 @@
       return value.trim();
     };
     
+    // 安全获取状态名称，防止因脏数据导致的崩溃
     const getStatusTitle = (statusKey) => COLUMN_CONFIG[statusKey]?.title || statusKey || '未知状态';
     
     const sortTasks = (tasksList) => [...tasksList].sort((a, b) => {
@@ -253,6 +347,71 @@
       if (wa !== wb) return wb - wa;
       return getCreatedAt(b) - getCreatedAt(a);
     });
+
+    const buildExportRows = (tasksList) => sortTasks(tasksList).map(task => ({
+      '板块分类': task.category || '未分类',
+      '事项标题': task.task || '未命名事项',
+      '最新进展': task.progress || '',
+      '内部说明备注': task.detail || '',
+      '看板状态': getStatusTitle(getBoardColumnKey(task)),
+      '当前业务状态': task.status || 'To Do',
+      '优先级': task.priority || 'P2 - 正常',
+      '需过目': task.isUrgent ? '是' : '否',
+      '参与人': task.assignee || '未分配',
+      '开始日期': task.startDate || '',
+      '截止日期': task.dueDate || '',
+      '相关链接': task.attachmentUrl || '',
+      '创建时间': formatDateTime(task.createdAt),
+      '最后修订时间': formatDateTime(task.updatedAt)
+    }));
+
+    const downloadBlob = (blob, filename) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    const exportTasksToExcel = (tasksList) => {
+      const rows = buildExportRows(tasksList);
+      if (!rows.length) {
+        alert('当前列表没有可导出的内容。');
+        return;
+      }
+
+      const now = new Date();
+      const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      const filenameBase = `团队协作工作台_列表清单_${stamp}`;
+
+      if (window.XLSX) {
+        const worksheet = window.XLSX.utils.json_to_sheet(rows);
+        const workbook = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(workbook, worksheet, '工作进度');
+        const range = window.XLSX.utils.decode_range(worksheet['!ref']);
+        const columnWidths = [];
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          let maxLen = 10;
+          for (let r = range.s.r; r <= range.e.r; r++) {
+            const cell = worksheet[window.XLSX.utils.encode_cell({ r, c })];
+            const value = cell ? String(cell.v ?? '') : '';
+            maxLen = Math.max(maxLen, Math.min(value.length + 2, 40));
+          }
+          columnWidths.push({ wch: maxLen });
+        }
+        worksheet['!cols'] = columnWidths;
+        window.XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
+        return;
+      }
+
+      const headers = Object.keys(rows[0]);
+      const csv = [headers.join(','), ...rows.map(row => headers.map(key => `"${String(row[key] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
+      downloadBlob(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' }), `${filenameBase}.csv`);
+      alert('Excel 组件未加载成功，已改为导出 CSV，Excel 也可以直接打开。');
+    };
 
     const AvatarGroup = ({ name }) => {
       const names = (name && typeof name === 'string') ? name.split(/[,&、]/).map(n => n.trim()).filter(Boolean) : [];
@@ -410,7 +569,7 @@
             </div>
           </button>
           <div className={`swimlane-content bg-slate-50/50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}`}>
-            <div className="flex overflow-x-auto custom-scrollbar p-4 space-x-4 min-h-[220px] snap-x snap-mandatory">
+            <div className="flex overflow-x-auto custom-scrollbar p-4 space-x-4 min-h-[220px]">
               {columns.map(status => {
                 const config = COLUMN_CONFIG[status];
                 const colTasks = sortTasks(catTasks.filter(t => {
@@ -422,8 +581,8 @@
                 const isDragOver = draggedOverCol === dropKey;
                 const dropDisabled = status === 'Overdue';
                 
-                // 给进行中列动态分配更大的宽度，移动端适配原生滚动
-                const widthClass = status === 'In progress' ? 'w-[85vw] md:flex-1 md:min-w-[320px] lg:min-w-[400px] shrink-0 snap-center' : 'w-[80vw] md:w-[260px] shrink-0 snap-center';
+                // 给进行中列动态分配更大的宽度
+                const widthClass = status === 'In progress' ? 'flex-1 min-w-[400px]' : 'w-[260px] shrink-0';
 
                 return (
                   <div
@@ -549,55 +708,76 @@
 
     const TableView = ({ tasks, onEdit }) => {
       const rows = sortTasks(tasks);
+      const handleExport = () => exportTasksToExcel(tasks);
       return (
-        <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-auto custom-scrollbar">
-          <table className="w-full min-w-[960px] text-sm">
-            <thead className="sticky top-0 bg-slate-50 z-10">
-              <tr className="text-left text-slate-500 border-b border-slate-200">
-                <th className="px-4 py-3 font-semibold">板块分类</th>
-                <th className="px-4 py-3 font-semibold">事项标题</th>
-                <th className="px-4 py-3 font-semibold">进展动态</th>
-                <th className="px-4 py-3 font-semibold">状态</th>
-                <th className="px-4 py-3 font-semibold">优先级</th>
-                <th className="px-4 py-3 font-semibold">参与人</th>
-                <th className="px-4 py-3 font-semibold">开始日期</th>
-                <th className="px-4 py-3 font-semibold">截止日期</th>
-                <th className="px-4 py-3 font-semibold">最后修订时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan="9" className="px-4 py-16 text-center text-slate-400">暂无数据</td></tr>
-              ) : rows.map(task => (
-                <tr key={task.id} className="border-b border-slate-100 hover:bg-slate-50/70 cursor-pointer" onClick={() => onEdit(task)}>
-                  <td className="px-4 py-3 text-slate-600">{task.category || '未分类'}</td>
-                  <td className="px-4 py-3 font-medium text-slate-800">{task.task || '未命名事项'}</td>
-                  <td className="px-4 py-3 text-slate-600 max-w-[360px]"><div className="line-clamp-2">{task.progress || '-'}</div></td>
-                  <td className="px-4 py-3 text-slate-600">{getStatusTitle(getBoardColumnKey(task))}</td>
-                  <td className="px-4 py-3 text-slate-600">{task.priority || 'P2 - 正常'}</td>
-                  <td className="px-4 py-3 text-slate-600">{task.assignee || '未分配'}</td>
-                  <td className="px-4 py-3 text-slate-600">{task.startDate || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600">{task.dueDate || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 text-[12px]">{formatDateTime(task.updatedAt)}</td>
+        <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/90 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-bold text-slate-800">列表清单导出</div>
+              <div className="text-xs text-slate-500 mt-1">下载当前筛选结果，导出为 Excel，方便留存当下团队进度快照。</div>
+            </div>
+            <button
+              onClick={handleExport}
+              disabled={rows.length === 0}
+              className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-colors ${rows.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'}`}
+            >
+              <Icons.Download />
+              <span>下载 Excel</span>
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto custom-scrollbar">
+            <table className="w-full min-w-[960px] text-sm">
+              <thead className="sticky top-0 bg-slate-50 z-10">
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="px-4 py-3 font-semibold">板块分类</th>
+                  <th className="px-4 py-3 font-semibold">事项标题</th>
+                  <th className="px-4 py-3 font-semibold">进展动态</th>
+                  <th className="px-4 py-3 font-semibold">状态</th>
+                  <th className="px-4 py-3 font-semibold">优先级</th>
+                  <th className="px-4 py-3 font-semibold">参与人</th>
+                  <th className="px-4 py-3 font-semibold">开始日期</th>
+                  <th className="px-4 py-3 font-semibold">截止日期</th>
+                  <th className="px-4 py-3 font-semibold">最后修订时间</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr><td colSpan="9" className="px-4 py-16 text-center text-slate-400">暂无数据</td></tr>
+                ) : rows.map(task => (
+                  <tr key={task.id} className="border-b border-slate-100 hover:bg-slate-50/70 cursor-pointer" onClick={() => onEdit(task)}>
+                    <td className="px-4 py-3 text-slate-600">{task.category || '未分类'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{task.task || '未命名事项'}</td>
+                    <td className="px-4 py-3 text-slate-600 max-w-[360px]"><div className="line-clamp-2">{task.progress || '-'}</div></td>
+                    <td className="px-4 py-3 text-slate-600">{getStatusTitle(getBoardColumnKey(task))}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.priority || 'P2 - 正常'}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.assignee || '未分配'}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.startDate || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{task.dueDate || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600 text-[12px]">{formatDateTime(task.updatedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       );
     };
 
+
     function App() {
       const [tasks, setTasks] = useState(DEFAULT_TASKS);
       const [user, setUser] = useState(null);
+      const [authReady, setAuthReady] = useState(false);
       const [loading, setLoading] = useState(true);
       const [saving, setSaving] = useState(false);
+      const [errorMsg, setErrorMsg] = useState('');
       const [draggedOverCol, setDraggedOverCol] = useState(null);
       const [editingTask, setEditingTask] = useState(null);
       const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
 
       const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
-      const getDocRef = (taskId) => window.FB && window.FB.db ? window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId) : null;
+      const getTasksCollectionRef = () => window.FB?.db ? window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks') : null;
+      const getDocRef = (taskId) => window.FB?.db ? window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId) : null;
 
       useEffect(() => {
         let isMounted = true;
@@ -605,70 +785,77 @@
 
         const initAuthAndListen = async () => {
           if (!window.FB?.auth) {
-            if (isMounted) setUser({ uid: 'mobile-bypass-user' });
+            const initError = window.__fbInitError;
+            if (isMounted) {
+              setErrorMsg(initError?.message || 'Firebase 初始化失败，请检查网络，或浏览器是否拦截了 gstatic Firebase SDK。');
+              setLoading(false);
+            }
             return;
           }
-          
+
           authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
-            if (isMounted && u) setUser(u);
+            if (!isMounted) return;
+            setUser(u || null);
+            setAuthReady(true);
+            console.log('onAuthStateChanged =>', u ? { uid: u.uid, isAnonymous: u.isAnonymous } : null);
           });
 
           try {
-            const loginPromise = (typeof __initial_auth_token !== 'undefined' && __initial_auth_token)
-              ? window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token)
-              : window.FB.signInAnonymously(window.FB.auth);
-              
-            const timeoutPromise = new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 1500));
-            
-            const result = await Promise.race([loginPromise, timeoutPromise]);
-            
-            if (result === 'TIMEOUT' && isMounted) {
-              console.warn('Auth blocked on mobile. Forcing bypass...');
-              setUser(prev => prev || { uid: 'mobile-bypass-user' });
+            if (!window.FB.auth.currentUser) {
+              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token);
+              } else {
+                await window.FB.signInAnonymously(window.FB.auth);
+              }
+            } else if (isMounted) {
+              setAuthReady(true);
             }
           } catch (e) {
-            console.warn('Auth failed. Forcing bypass...', e);
-            if (isMounted) setUser(prev => prev || { uid: 'mobile-bypass-user' });
+            console.error('Firebase Auth failed:', e);
+            if (isMounted) {
+              setErrorMsg(e?.message || 'Firebase 认证失败');
+              setLoading(false);
+            }
           }
         };
 
         const handleFbLoaded = () => { initAuthAndListen(); };
 
-        if (window.FB) {
+        if (typeof window.FB !== 'undefined') {
           initAuthAndListen();
         } else {
           window.addEventListener('firebase-loaded', handleFbLoaded);
         }
-        
-        return () => { 
+
+        return () => {
           isMounted = false;
-          if (authUnsub) authUnsub(); 
+          if (authUnsub) authUnsub();
           window.removeEventListener('firebase-loaded', handleFbLoaded);
         };
       }, []);
 
       useEffect(() => {
-        if (!user || !window.FB?.db) return;
-        const colRef = window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks');
+        if (!authReady || !window.FB?.db || !window.FB?.auth?.currentUser) return;
+
+        const colRef = getTasksCollectionRef();
         const unsub = window.FB.onSnapshot(colRef, (snapshot) => {
           const fetchedTasks = [];
           snapshot.forEach(docSnap => {
             const data = docSnap.data() || {};
             fetchedTasks.push({ id: docSnap.id, ...data });
           });
-          setTasks(fetchedTasks.length ? fetchedTasks : DEFAULT_TASKS);
+          console.log('Firebase snapshot size =', snapshot.size);
+          setTasks(fetchedTasks);
+          setErrorMsg('');
           setLoading(false);
         }, (err) => {
-          console.error('Firestore sync error:', err);
+          console.error('Firebase 数据同步失败:', err);
+          setErrorMsg(err?.message || '数据读取失败，请检查 Firebase 权限配置。');
           setLoading(false);
         });
-        return () => unsub();
-      }, [user]);
 
-      useEffect(() => {
-        const timer = setTimeout(() => { if (loading) setLoading(false); }, 2000);
-        return () => clearTimeout(timer);
-      }, [loading]);
+        return () => unsub();
+      }, [authReady, deployAppId]);
 
       const categories = useMemo(() => ['All', ...new Set(tasks.map(t => t.category).filter(Boolean).sort())], [tasks]);
       const assignees = useMemo(() => ['All', ...new Set(tasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))], [tasks]);
@@ -698,13 +885,12 @@
 
       const completedArchiveTasks = useMemo(() => sortTasks(filteredTasks.filter(t => getBoardColumnKey(t) === 'Done')), [filteredTasks]);
 
-      // 这里修改默认状态为 'In progress'，在点击新增的时候就会跳过 'To Do'
       const openNewTask = () => setEditingTask({
         category: filters.category !== 'All' ? filters.category : '',
         task: '',
         detail: '',
         progress: '',
-        status: 'In progress', 
+        status: 'To Do',
         priority: 'P2 - 正常',
         isUrgent: false,
         assignee: '',
@@ -778,6 +964,7 @@
         const targetTask = tasks.find(t => t.id === taskId);
         if (!targetTask) return;
         
+        // 拖入“需过目”列：仅仅打上 isUrgent 标记，不破坏其原有的底层 status
         let newStatus = targetTask.status;
         let newIsUrgent = targetTask.isUrgent;
         
@@ -872,16 +1059,29 @@
         );
       }
 
+      if (errorMsg) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 text-center">
+            <div className="max-w-xl bg-white border border-red-100 shadow-sm rounded-2xl p-6">
+              <div className="text-red-600 font-bold text-lg mb-2">Firebase 连接失败</div>
+              <div className="text-slate-600 text-sm leading-6 break-words">{errorMsg}</div>
+              <div className="mt-4 text-xs text-slate-400 break-all">
+                当前路径：artifacts/{deployAppId}/public/data/kanban_tasks
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="flex flex-col h-screen w-full overflow-hidden bg-transparent">
-          {/* 取消了 header 级别的强行 min-w 限制 */}
-          <header className="glass-header border-b border-white/60 shrink-0 z-20">
-            <div className="w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+          <header className="glass-header border-b border-white/60 shrink-0 z-20 overflow-x-auto custom-scrollbar">
+            <div className="min-w-[1200px] max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
+              <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
                 </div>
-                <div className="flex flex-wrap gap-2 md:gap-3 items-center">
+                <div className="flex flex-wrap gap-3 items-center">
                   <div className="flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner">
                     {viewOptions.map(v => (
                       <button key={v.id} onClick={() => setFilters(f => ({ ...f, view: v.id }))} className={`px-3.5 py-1.5 text-[12px] font-medium rounded-xl transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
@@ -893,15 +1093,14 @@
                 </div>
               </div>
 
-              {/* 移动端水平滚动，PC 端依然保持网格 */}
-              <div className="flex overflow-x-auto md:grid md:grid-cols-3 xl:grid-cols-5 gap-3 pb-2 custom-scrollbar snap-x">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                 {summaryCards.map(card => {
                   const active = filters.status === card.status;
                   return (
                     <button
                       key={card.label}
                       onClick={() => setFilters(f => ({ ...f, status: active ? 'All' : card.status }))}
-                      className={`summary-card summary-card-btn rounded-2xl p-3 shrink-0 min-w-[140px] md:min-w-0 snap-start ${active ? 'active' : ''}`}
+                      className={`summary-card summary-card-btn rounded-2xl p-3 ${active ? 'active' : ''}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs text-slate-500">{card.label}</div>
@@ -913,7 +1112,7 @@
                 })}
               </div>
 
-              <div className="flex overflow-x-auto custom-scrollbar gap-2 md:gap-3 items-center pb-2">
+              <div className="flex overflow-x-auto custom-scrollbar gap-3 items-center pb-2">
                 <div className="panel-glass rounded-2xl px-3.5 py-2.5 flex items-center gap-3 flex-shrink-0 min-w-[240px]">
                   <Icons.Search />
                   <input value={filters.search} onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="搜索事项、负责人、进展..." className="w-full bg-transparent outline-none text-sm" />
@@ -940,13 +1139,11 @@
           </header>
 
           <main className="flex-1 overflow-auto custom-scrollbar px-4 md:px-6 py-6 board-main">
-            {/* 取消了 main 级别的强行 min-w 限制 */}
-            <div className="w-full max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
+            <div className="min-w-[1280px] max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
               {filters.view === 'kanban' && (
                 <div className="flex flex-col h-full">
-                  {/* 针对手机屏幕允许左右滚动滑动 */}
-                  <div className="flex gap-4 md:gap-5 items-stretch h-[75vh] min-h-[500px] md:min-h-[600px] overflow-x-auto custom-scrollbar pb-4 snap-x snap-mandatory">
-                    <div className="w-[85vw] max-w-[320px] md:max-w-none md:w-[320px] shrink-0 flex flex-col snap-center">
+                  <div className="flex gap-5 items-stretch h-[75vh] min-h-[600px]">
+                    <div className="w-[320px] shrink-0 flex flex-col">
                       {renderColumnSection(
                         'Need Attention',
                         false,
@@ -956,10 +1153,10 @@
                         })
                       )}
                     </div>
-                    <div className="w-[85vw] max-w-[400px] md:max-w-none md:flex-1 md:min-w-[320px] lg:min-w-[400px] shrink-0 flex flex-col snap-center">
+                    <div className="flex-1 min-w-[400px] flex flex-col">
                       {renderColumnSection('In progress')}
                     </div>
-                    <div className="w-[85vw] max-w-[320px] md:max-w-none md:w-[320px] shrink-0 flex flex-col gap-4 md:gap-5 snap-center">
+                    <div className="w-[320px] shrink-0 flex flex-col gap-5">
                       {renderColumnSection('Overdue')}
                       {renderColumnSection('Pending')}
                     </div>
@@ -989,28 +1186,22 @@
           </main>
 
           {editingTask && (
-            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 md:p-6 modal-overlay">
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 modal-overlay">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200/50 modal-content">
-                <div className="px-5 md:px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
                   <h2 className="text-lg font-bold text-slate-800">{editingTask.id ? '编辑事项' : '新增事项'}</h2>
                   <button onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                 </div>
-                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6 space-y-5 md:space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="md:col-span-2"><label className="block text-[14px] font-semibold text-slate-600 mb-2">事项标题</label><input name="task" defaultValue={editingTask.task || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} required /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label><input name="category" defaultValue={editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-                    <div>
-                      <label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label>
-                      {/* 如果是新增事项(!editingTask.id)，则通过 filter 屏蔽掉 To Do 选项 */}
-                      <select name="status" defaultValue={editingTask.status || 'In progress'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
-                        {EDITABLE_STATUS_OPTIONS.filter(opt => editingTask.id || opt !== 'To Do').map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}
-                      </select>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">优先级</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
                   </div>
                   <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="3" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
@@ -1018,7 +1209,7 @@
                   <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
                   <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
                 </form>
-                <div className="px-5 md:px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
+                <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
                   {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
                   <div className="flex space-x-3">
                     <button type="button" onClick={() => setEditingTask(null)} disabled={saving} className="px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
