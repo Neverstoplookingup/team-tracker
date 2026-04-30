@@ -127,6 +127,7 @@
     @keyframes slideUp { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
     .modal-overlay { animation: fadeIn 0.2s ease-out forwards; }
     .modal-content { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .app-shell { height: 100vh; height: 100dvh; }
   </style>
 </head>
 <body>
@@ -187,8 +188,10 @@
     window.FB = {
       auth,
       db,
-      doc: (...segments) => db.doc(segments.join('/')),
-      collection: (...segments) => db.collection(segments.join('/')),
+      // 兼容版 SDK 的 doc/collection 也统一成模块版调用签名：
+      // window.FB.collection(window.FB.db, 'a', 'b')
+      doc: (dbInstance, ...segments) => dbInstance.doc(segments.join('/')),
+      collection: (dbInstance, ...segments) => dbInstance.collection(segments.join('/')),
       setDoc: (ref, data) => ref.set(data),
       deleteDoc: (ref) => ref.delete(),
       updateDoc: (ref, data) => ref.update(data),
@@ -319,12 +322,25 @@
       for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
       return `hsl(${Math.abs(hash) % 360}, 65%, 78%)`;
     };
+    // 用固定业务时区判断逾期，避免电脑/手机因系统时区不同导致看板数据位置不一致。
+    const BUSINESS_TIME_ZONE = 'America/Los_Angeles';
+    const getTodayKey = () => new Intl.DateTimeFormat('en-CA', {
+      timeZone: BUSINESS_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+
     const isOverdue = (task) => {
       if (!task?.dueDate || task?.status === 'Done') return false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const due = parseDateOnly(task.dueDate);
-      return due ? due < today : false;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(task.dueDate)) {
+        const due = parseDateOnly(task.dueDate);
+        if (!due) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return due < today;
+      }
+      return task.dueDate < getTodayKey();
     };
     const getBoardColumnKey = (task) => {
       if (!task) return 'To Do';
@@ -837,24 +853,38 @@
       useEffect(() => {
         if (!authReady || !window.FB?.db || !window.FB?.auth?.currentUser) return;
 
-        const colRef = getTasksCollectionRef();
-        const unsub = window.FB.onSnapshot(colRef, (snapshot) => {
-          const fetchedTasks = [];
-          snapshot.forEach(docSnap => {
-            const data = docSnap.data() || {};
-            fetchedTasks.push({ id: docSnap.id, ...data });
-          });
-          console.log('Firebase snapshot size =', snapshot.size);
-          setTasks(fetchedTasks);
-          setErrorMsg('');
-          setLoading(false);
-        }, (err) => {
-          console.error('Firebase 数据同步失败:', err);
-          setErrorMsg(err?.message || '数据读取失败，请检查 Firebase 权限配置。');
-          setLoading(false);
-        });
+        let unsub = null;
+        try {
+          const colRef = getTasksCollectionRef();
+          if (!colRef) throw new Error('无法创建 Firestore 数据路径。');
 
-        return () => unsub();
+          console.log('Firebase init mode =', window.__fbInitMode);
+          console.log('Tasks collection path =', colRef.path || colRef._path?.canonicalString?.() || colRef.toString?.());
+
+          unsub = window.FB.onSnapshot(colRef, (snapshot) => {
+            const fetchedTasks = [];
+            snapshot.forEach(docSnap => {
+              const data = docSnap.data() || {};
+              fetchedTasks.push({ id: docSnap.id, ...data });
+            });
+            console.log('Firebase snapshot size =', snapshot.size);
+            setTasks(fetchedTasks);
+            setErrorMsg('');
+            setLoading(false);
+          }, (err) => {
+            console.error('Firebase 数据同步失败:', err);
+            setErrorMsg(err?.message || '数据读取失败，请检查 Firebase 权限配置。');
+            setLoading(false);
+          });
+        } catch (err) {
+          console.error('Firestore 初始化失败:', err);
+          setErrorMsg(err?.message || 'Firestore 初始化失败，请检查浏览器兼容性或 Firebase 配置。');
+          setLoading(false);
+        }
+
+        return () => {
+          if (unsub) unsub();
+        };
       }, [authReady, deployAppId]);
 
       const categories = useMemo(() => ['All', ...new Set(tasks.map(t => t.category).filter(Boolean).sort())], [tasks]);
@@ -1074,9 +1104,9 @@
       }
 
       return (
-        <div className="flex flex-col h-screen w-full overflow-hidden bg-transparent">
+        <div className="app-shell flex flex-col w-full overflow-hidden bg-transparent">
           <header className="glass-header border-b border-white/60 shrink-0 z-20 overflow-x-auto custom-scrollbar">
-            <div className="min-w-[1200px] max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
+            <div className="w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
               <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
                 <div>
                   <h1 className="text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
@@ -1139,11 +1169,12 @@
           </header>
 
           <main className="flex-1 overflow-auto custom-scrollbar px-4 md:px-6 py-6 board-main">
-            <div className="min-w-[1280px] max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
+            <div className="w-full max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
               {filters.view === 'kanban' && (
                 <div className="flex flex-col h-full">
-                  <div className="flex gap-5 items-stretch h-[75vh] min-h-[600px]">
-                    <div className="w-[320px] shrink-0 flex flex-col">
+                  <div className="flex flex-col xl:flex-row gap-5 items-stretch xl:h-[75vh] xl:min-h-[600px]">
+                    <div className="w-full xl:w-[320px] xl:shrink-0 flex flex-col min-h-[420px] xl:min-h-0">
+                      {/* 桌面端保持原设计：左侧“需过目”列同时承载需过目与待处理事项，不单独新增“待处理”列。 */}
                       {renderColumnSection(
                         'Need Attention',
                         false,
@@ -1153,10 +1184,10 @@
                         })
                       )}
                     </div>
-                    <div className="flex-1 min-w-[400px] flex flex-col">
+                    <div className="w-full xl:flex-1 xl:min-w-[400px] flex flex-col min-h-[420px] xl:min-h-0">
                       {renderColumnSection('In progress')}
                     </div>
-                    <div className="w-[320px] shrink-0 flex flex-col gap-5">
+                    <div className="w-full xl:w-[320px] xl:shrink-0 flex flex-col gap-5 min-h-[420px] xl:min-h-0">
                       {renderColumnSection('Overdue')}
                       {renderColumnSection('Pending')}
                     </div>
