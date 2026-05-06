@@ -241,6 +241,41 @@
       .modal-content { max-height: 88dvh !important; border-radius: 1rem !important; }
     }
 
+    /* 追加移动端兜底体验优化：避免顶部内容被截断，手机编辑弹窗改为底部抽屉 */
+    .sync-banner {
+      border: 1px solid rgba(251, 191, 36, .42);
+      background: rgba(255, 251, 235, .88);
+      color: #92400e;
+    }
+
+    @media (max-width: 767px) {
+      body { background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%); }
+      .mobile-compact-header { max-height: none !important; overflow: visible !important; }
+      .mobile-main {
+        min-height: 0 !important;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
+      }
+      .mobile-summary-strip, .mobile-filter-bar, .mobile-view-tabs { scrollbar-width: none; }
+      .mobile-summary-strip::-webkit-scrollbar,
+      .mobile-filter-bar::-webkit-scrollbar,
+      .mobile-view-tabs::-webkit-scrollbar { display: none; }
+      .task-card:hover { transform: none !important; }
+      .task-card { cursor: pointer !important; }
+      .modal-overlay {
+        align-items: flex-end !important;
+        padding: .5rem !important;
+      }
+      .modal-content {
+        width: 100% !important;
+        max-height: 92dvh !important;
+        border-radius: 1.25rem 1.25rem .75rem .75rem !important;
+      }
+      .modal-content form { padding: 1rem !important; }
+      .modal-content > div:first-child,
+      .modal-content > div:last-child { padding-left: 1rem !important; padding-right: 1rem !important; }
+      .modal-content > div:last-child { padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -266,18 +301,44 @@
     : userConfig;
 
   const FB_SDK_VERSION = '12.11.0';
+  const FIREBASE_INIT_TIMEOUT_MS = 9000;
 
   function dispatchFirebaseLoaded() {
+    window.__fbInitFinishedAt = Date.now();
     window.dispatchEvent(new Event('firebase-loaded'));
+  }
+
+  function withTimeout(promise, ms, label) {
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(label || '操作超时')), ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
   }
 
   function createScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('Script load timeout: ' + src));
+      }, FIREBASE_INIT_TIMEOUT_MS);
       s.src = src;
       s.async = true;
-      s.onload = () => resolve(src);
-      s.onerror = () => reject(new Error('Script load failed: ' + src));
+      s.onload = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(src);
+      };
+      s.onerror = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(new Error('Script load failed: ' + src));
+      };
       document.head.appendChild(s);
     });
   }
@@ -319,11 +380,11 @@
   }
 
   async function initFirebaseWithModule() {
-    const [appMod, authMod, fsMod] = await Promise.all([
+    const [appMod, authMod, fsMod] = await withTimeout(Promise.all([
       import(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-app.js`),
       import(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-auth.js`),
       import(`https://www.gstatic.com/firebasejs/${FB_SDK_VERSION}/firebase-firestore.js`)
-    ]);
+    ]), FIREBASE_INIT_TIMEOUT_MS, 'Firebase module SDK 加载超时');
 
     const { initializeApp } = appMod;
     const { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = authMod;
@@ -352,18 +413,21 @@
   }
 
   (async () => {
+    window.__fbInitStartedAt = Date.now();
     try {
-      await initFirebaseWithModule();
-    } catch (moduleError) {
-      console.warn('Module SDK failed, trying compat fallback...', moduleError);
+      // 手机端浏览器对动态 import 的 Firebase module SDK 更容易出现“挂起不报错”。
+      // 因此优先使用兼容版脚本加载，失败后再尝试 module 方案。
+      await withTimeout(initFirebaseWithCompat(), FIREBASE_INIT_TIMEOUT_MS * 2, 'Firebase compat 初始化超时');
+    } catch (compatError) {
+      console.warn('Compat SDK failed, trying module fallback...', compatError);
       try {
-        await initFirebaseWithCompat();
-      } catch (compatError) {
-        window.__fbInitError = compatError;
+        await withTimeout(initFirebaseWithModule(), FIREBASE_INIT_TIMEOUT_MS, 'Firebase module 初始化超时');
+      } catch (moduleError) {
+        window.__fbInitError = moduleError;
         window.FB = null;
-        console.error('Firebase module + compat init both failed:', {
-          moduleError,
-          compatError
+        console.error('Firebase compat + module init both failed:', {
+          compatError,
+          moduleError
         });
       }
     } finally {
@@ -403,7 +467,18 @@
     const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
     const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
 
-    // 去除代码硬编码的假数据，确保用户始终看到真实的云端或自己创建的数据
+    const FIREBASE_CLIENT_TIMEOUT_MS = 10000;
+
+    const clientTimeout = (promise, ms, label) => {
+      let timer;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(label || '操作超时')), ms);
+      });
+      return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+    };
+
+    // 不再使用本地数据兜底，确保手机端和电脑端进入的是同一个 Firestore 云端看板。
+    // 云端连接慢时，先打开工作台界面并显示连接状态；云端快照返回后自动填充真实数据。
     const DEFAULT_TASKS = [];
 
     const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -894,12 +969,14 @@
 
 
     function App() {
-      const [tasks, setTasks] = useState(DEFAULT_TASKS);
+      const [tasks, setTasks] = useState(() => DEFAULT_TASKS);
       const [user, setUser] = useState(null);
       const [authReady, setAuthReady] = useState(false);
-      const [loading, setLoading] = useState(true);
+      const [loading, setLoading] = useState(false);
       const [saving, setSaving] = useState(false);
       const [errorMsg, setErrorMsg] = useState('');
+      const [syncMode, setSyncMode] = useState('connecting');
+      const [connectionNotice, setConnectionNotice] = useState('正在连接云端数据...');
       const [draggedOverCol, setDraggedOverCol] = useState(null);
       const [editingTask, setEditingTask] = useState(null);
       const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
@@ -911,62 +988,94 @@
       useEffect(() => {
         let isMounted = true;
         let authUnsub = null;
+        let fbWaitTimer = null;
+
+        const openWorkspaceWithCloudIssue = (message) => {
+          if (!isMounted) return;
+          setSyncMode('error');
+          setConnectionNotice(message);
+          setErrorMsg(message);
+          setLoading(false);
+        };
 
         const initAuthAndListen = async () => {
           if (!window.FB?.auth) {
             const initError = window.__fbInitError;
-            if (isMounted) {
-              setErrorMsg(initError?.message || 'Firebase 初始化失败，请检查网络，或浏览器是否拦截了 gstatic Firebase SDK。');
-              setLoading(false);
-            }
+            openWorkspaceWithCloudIssue(initError?.message || 'Firebase 初始化失败或超时。工作台界面已打开，但云端数据暂未连接；请检查手机网络、浏览器隐私拦截或刷新重试。');
             return;
           }
 
-          authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
-            if (!isMounted) return;
-            setUser(u || null);
-            setAuthReady(true);
-            console.log('onAuthStateChanged =>', u ? { uid: u.uid, isAnonymous: u.isAnonymous } : null);
-          });
+          setSyncMode('connecting');
+          setConnectionNotice('正在连接云端数据...');
+
+          if (!authUnsub) {
+            authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
+              if (!isMounted) return;
+              setUser(u || null);
+              if (u) setAuthReady(true);
+              console.log('onAuthStateChanged =>', u ? { uid: u.uid, isAnonymous: u.isAnonymous } : null);
+            });
+          }
 
           try {
             if (!window.FB.auth.currentUser) {
               if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token);
+                await clientTimeout(window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token), FIREBASE_CLIENT_TIMEOUT_MS, 'Firebase 自定义登录超时');
               } else {
-                await window.FB.signInAnonymously(window.FB.auth);
+                await clientTimeout(window.FB.signInAnonymously(window.FB.auth), FIREBASE_CLIENT_TIMEOUT_MS, 'Firebase 匿名登录超时');
               }
             } else if (isMounted) {
               setAuthReady(true);
             }
+
+            // 移动端部分浏览器里 onAuthStateChanged 回调可能比 signIn promise 更晚触发。
+            // 签名成功后主动推进 authReady，避免继续等待导致看板不读云端数据。
+            if (isMounted && window.FB.auth.currentUser) {
+              setUser(window.FB.auth.currentUser);
+              setAuthReady(true);
+            }
           } catch (e) {
             console.error('Firebase Auth failed:', e);
-            if (isMounted) {
-              setErrorMsg(e?.message || 'Firebase 认证失败');
-              setLoading(false);
-            }
+            openWorkspaceWithCloudIssue((e?.message || 'Firebase 认证失败') + '。工作台界面已打开，但暂时不能读写云端数据；请刷新或检查 Firebase 认证设置。');
           }
         };
 
-        const handleFbLoaded = () => { initAuthAndListen(); };
+        const handleFbLoaded = () => {
+          if (fbWaitTimer) clearTimeout(fbWaitTimer);
+          initAuthAndListen();
+        };
+
+        fbWaitTimer = setTimeout(() => {
+          if (!isMounted || window.FB?.auth) return;
+          openWorkspaceWithCloudIssue('手机端等待 Firebase SDK 加载超时。工作台界面已打开，并会继续等待云端连接；请检查移动网络、浏览器隐私拦截或刷新重试。');
+        }, FIREBASE_CLIENT_TIMEOUT_MS + 2000);
 
         if (typeof window.FB !== 'undefined') {
-          initAuthAndListen();
+          handleFbLoaded();
         } else {
           window.addEventListener('firebase-loaded', handleFbLoaded);
         }
 
         return () => {
           isMounted = false;
+          if (fbWaitTimer) clearTimeout(fbWaitTimer);
           if (authUnsub) authUnsub();
           window.removeEventListener('firebase-loaded', handleFbLoaded);
         };
       }, []);
 
       useEffect(() => {
-        if (!authReady || !window.FB?.db || !window.FB?.auth?.currentUser) return;
+        if (!authReady) return;
+
+        if (!window.FB?.db || !window.FB?.auth?.currentUser) {
+          setSyncMode('connecting');
+          setConnectionNotice('云端认证尚未完成。工作台已打开，但数据需要云端连接成功后才会显示。');
+          setLoading(false);
+          return;
+        }
 
         let unsub = null;
+        let snapshotTimer = null;
         try {
           const colRef = getTasksCollectionRef();
           if (!colRef) throw new Error('无法创建 Firestore 数据路径。');
@@ -974,7 +1083,14 @@
           console.log('Firebase init mode =', window.__fbInitMode);
           console.log('Tasks collection path =', colRef.path || colRef._path?.canonicalString?.() || colRef.toString?.());
 
+          snapshotTimer = setTimeout(() => {
+            setSyncMode('connecting');
+            setConnectionNotice('已进入工作台，正在等待云端数据返回；云端快照返回后会自动显示团队数据。');
+            setLoading(false);
+          }, FIREBASE_CLIENT_TIMEOUT_MS + 3000);
+
           unsub = window.FB.onSnapshot(colRef, (snapshot) => {
+            if (snapshotTimer) clearTimeout(snapshotTimer);
             const fetchedTasks = [];
             snapshot.forEach(docSnap => {
               const data = docSnap.data() || {};
@@ -982,20 +1098,29 @@
             });
             console.log('Firebase snapshot size =', snapshot.size);
             setTasks(fetchedTasks);
+            setSyncMode('cloud');
+            setConnectionNotice('');
             setErrorMsg('');
             setLoading(false);
           }, (err) => {
+            if (snapshotTimer) clearTimeout(snapshotTimer);
             console.error('Firebase 数据同步失败:', err);
-            setErrorMsg(err?.message || '数据读取失败，请检查 Firebase 权限配置。');
+            setSyncMode('error');
+            setConnectionNotice((err?.message || '数据读取失败，请检查 Firebase 权限配置。') + ' 工作台已打开，但当前不能读取云端数据。');
+            setErrorMsg('');
             setLoading(false);
           });
         } catch (err) {
+          if (snapshotTimer) clearTimeout(snapshotTimer);
           console.error('Firestore 初始化失败:', err);
-          setErrorMsg(err?.message || 'Firestore 初始化失败，请检查浏览器兼容性或 Firebase 配置。');
+          setSyncMode('error');
+          setConnectionNotice((err?.message || 'Firestore 初始化失败，请检查浏览器兼容性或 Firebase 配置。') + ' 工作台已打开，但当前不能读取云端数据。');
+          setErrorMsg('');
           setLoading(false);
         }
 
         return () => {
+          if (snapshotTimer) clearTimeout(snapshotTimer);
           if (unsub) unsub();
         };
       }, [authReady, deployAppId]);
@@ -1069,12 +1194,16 @@
         setTasks(nextTasks);
         try {
           const docRef = getDocRef(taskId);
-          if (window.FB?.setDoc && window.FB?.db && docRef) await window.FB.setDoc(docRef, taskData);
+          if (window.FB?.setDoc && window.FB?.db && docRef && window.FB?.auth?.currentUser) {
+            await window.FB.setDoc(docRef, taskData);
+          } else {
+            throw new Error('云端尚未连接成功，暂时无法保存。请等待“云端同步”状态出现后再操作，或刷新页面。');
+          }
           setEditingTask(null);
         } catch (err) {
           console.error(err);
           setTasks(prevTasks);
-          alert('保存失败，请重试');
+          alert(err?.message || '保存失败，请重试');
         } finally {
           setSaving(false);
         }
@@ -1087,12 +1216,16 @@
         setTasks(tasks.filter(t => t.id !== editingTask.id));
         try {
           const docRef = getDocRef(editingTask.id);
-          if (window.FB?.deleteDoc && window.FB?.db && docRef) await window.FB.deleteDoc(docRef);
+          if (window.FB?.deleteDoc && window.FB?.db && docRef && window.FB?.auth?.currentUser) {
+            await window.FB.deleteDoc(docRef);
+          } else {
+            throw new Error('云端尚未连接成功，暂时无法删除。请等待“云端同步”状态出现后再操作，或刷新页面。');
+          }
           setEditingTask(null);
         } catch (err) {
           console.error(err);
           setTasks(prevTasks);
-          alert('删除失败，请重试');
+          alert(err?.message || '删除失败，请重试');
         } finally {
           setSaving(false);
         }
@@ -1129,19 +1262,23 @@
         setTasks(nextTasks);
         try {
           const docRef = getDocRef(taskId);
-          if (window.FB?.updateDoc && window.FB?.db && docRef) await window.FB.updateDoc(docRef, updatedFields);
+          if (window.FB?.updateDoc && window.FB?.db && docRef && window.FB?.auth?.currentUser) {
+            await window.FB.updateDoc(docRef, updatedFields);
+          } else {
+            throw new Error('云端尚未连接成功，暂时无法更新。请等待“云端同步”状态出现后再操作，或刷新页面。');
+          }
         } catch (err) {
           console.error(err);
           setTasks(prevTasks);
-          alert('拖拽更新失败，请重试');
+          alert(err?.message || '拖拽更新失败，请重试');
         }
       };
 
       const viewOptions = [
-        { id: 'kanban', label: '看板视图' },
-        { id: 'swimlane', label: '板块内项目概览' },
-        { id: 'timeline', label: '各板块进度条' },
-        { id: 'table', label: '列表清单' }
+        { id: 'kanban', label: '看板' },
+        { id: 'swimlane', label: '板块概览' },
+        { id: 'timeline', label: '进度条' },
+        { id: 'table', label: '清单' }
       ];
 
       const summaryCards = [
@@ -1151,6 +1288,9 @@
         { label: '已完成', value: summary.done, status: 'Done', accent: 'text-emerald-600' },
         { label: '已逾期', value: summary.overdue, status: 'Overdue', accent: 'text-red-600' }
       ];
+
+      const syncLabel = syncMode === 'cloud' ? '云端同步' : (syncMode === 'error' ? '云端异常' : '连接云端');
+      const syncLabelClass = syncMode === 'cloud' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : (syncMode === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-slate-100 text-slate-500 border-slate-200');
 
       const renderColumnSection = (status, compact = false, taskSource = null) => {
         const config = COLUMN_CONFIG[status];
@@ -1195,23 +1335,10 @@
 
       if (loading) {
         return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-            <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-            <h2 className="text-slate-500 font-medium text-sm">正在加载工作台...</h2>
-          </div>
-        );
-      }
-
-      if (errorMsg) {
-        return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 text-center">
-            <div className="max-w-xl bg-white border border-red-100 shadow-sm rounded-2xl p-6">
-              <div className="text-red-600 font-bold text-lg mb-2">Firebase 连接失败</div>
-              <div className="text-slate-600 text-sm leading-6 break-words">{errorMsg}</div>
-              <div className="mt-4 text-xs text-slate-400 break-all">
-                当前路径：artifacts/{deployAppId}/public/data/kanban_tasks
-              </div>
-            </div>
+            <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+            <h2 className="text-slate-500 font-medium text-sm">正在启动工作台...</h2>
+            <p className="text-xs text-slate-400 mt-2 max-w-xs leading-5">正在连接同一个云端看板；若网络较慢，也会先打开界面，不再无限停留在加载页。</p>
           </div>
         );
       }
@@ -1221,8 +1348,12 @@
           <header className="glass-header mobile-compact-header border-b border-white/60 shrink-0 z-40 overflow-hidden">
             <div className="mobile-header-inner w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
               <div className="mobile-top-row flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
-                <div>
-                  <h1 className="mobile-title text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="mobile-title text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${syncLabelClass}`}>{syncLabel}</span>
+                  </div>
+                  {connectionNotice && <div className="sync-banner mt-2 rounded-xl px-3 py-2 text-[11px] leading-5 max-w-3xl">{connectionNotice}</div>}
                 </div>
                 <div className="mobile-top-actions flex flex-wrap gap-3 items-center">
                   <div className="mobile-view-tabs flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner">
