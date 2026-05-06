@@ -276,6 +276,282 @@
       .modal-content > div:last-child { padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important; }
     }
 
+
+    /* 手机任务详情阅读优化：点击任务后先读清楚，再编辑 */
+    .task-detail-preview { display: none; }
+    .mobile-edit-hint { display: none; }
+
+    @media (max-width: 767px) {
+      .modal-content {
+        max-height: 96dvh !important;
+        border-radius: 1.35rem 1.35rem .85rem .85rem !important;
+      }
+      .modal-content > div:first-child {
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        padding-top: .9rem !important;
+        padding-bottom: .75rem !important;
+        background: rgba(255,255,255,.96) !important;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .modal-content form {
+        padding: .9rem 1rem 1rem !important;
+        gap: .95rem !important;
+      }
+      .modal-content input,
+      .modal-content select,
+      .modal-content textarea {
+        font-size: 16px !important; /* 避免 iOS 聚焦时自动放大 */
+      }
+      .modal-content label {
+        font-size: 12px !important;
+        letter-spacing: .01em;
+        color: #64748b !important;
+      }
+      .modal-content form > .grid {
+        gap: .8rem !important;
+      }
+      .task-detail-preview {
+        display: block;
+        padding: .75rem 1rem .9rem;
+        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.92));
+        border-bottom: 1px solid rgba(226,232,240,.85);
+      }
+      .task-detail-preview-card {
+        border: 1px solid rgba(199,210,254,.75);
+        border-radius: 1.1rem;
+        padding: .95rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+      }
+      .mobile-detail-topline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .45rem;
+        align-items: center;
+        margin-bottom: .65rem;
+      }
+      .mobile-detail-chip {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+        padding: .28rem .55rem;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid rgba(203,213,225,.9);
+      }
+      .mobile-detail-chip.status {
+        background: #eef2ff;
+        color: #4f46e5;
+        border-color: rgba(165,180,252,.75);
+      }
+      .mobile-detail-chip.urgent {
+        background: #fff1f2;
+        color: #e11d48;
+        border-color: rgba(253,164,175,.75);
+      }
+      .mobile-detail-title {
+        font-size: 18px;
+        line-height: 1.45;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0 0 .75rem;
+        word-break: break-word;
+      }
+      .mobile-detail-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .5rem;
+        margin-bottom: .75rem;
+      }
+      .mobile-detail-meta-item {
+        min-width: 0;
+        border-radius: .85rem;
+        background: #f8fafc;
+        border: 1px solid rgba(226,232,240,.9);
+        padding: .55rem .6rem;
+      }
+      .mobile-detail-meta-label {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        color: #94a3b8;
+        margin-bottom: .18rem;
+      }
+      .mobile-detail-meta-value {
+        display: block;
+        font-size: 12px;
+        line-height: 1.35;
+        font-weight: 700;
+        color: #334155;
+        overflow-wrap: anywhere;
+      }
+      .mobile-progress-reader {
+        max-height: 34dvh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 1rem;
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: .85rem .9rem;
+        border: 1px solid rgba(15,23,42,.12);
+      }
+      .mobile-read-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #93c5fd;
+        margin-bottom: .45rem;
+      }
+      .mobile-read-text {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 15px;
+        line-height: 1.75;
+      }
+      .mobile-detail-note {
+        margin-top: .75rem;
+        padding: .75rem;
+        border-radius: .9rem;
+        background: #f8fafc;
+        border: 1px dashed rgba(148,163,184,.55);
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .mobile-detail-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: .75rem;
+        padding: .7rem .85rem;
+        border-radius: .9rem;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 13px;
+        font-weight: 800;
+        border: 1px solid rgba(165,180,252,.65);
+      }
+      .mobile-edit-hint {
+        display: block;
+        margin: .1rem 0 -.15rem;
+        padding: .65rem .75rem;
+        border-radius: .9rem;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.45;
+        border: 1px solid rgba(226,232,240,.95);
+      }
+      .mobile-field-progress textarea {
+        min-height: 190px !important;
+        font-size: 16px !important;
+        line-height: 1.75 !important;
+        padding: 1rem !important;
+        border-radius: 1rem !important;
+        background: #ffffff !important;
+        border-color: rgba(129,140,248,.55) !important;
+        box-shadow: 0 0 0 3px rgba(99,102,241,.06);
+      }
+      .mobile-field-detail textarea {
+        min-height: 130px !important;
+        font-size: 16px !important;
+        line-height: 1.7 !important;
+        padding: 1rem !important;
+        border-radius: 1rem !important;
+        background: #ffffff !important;
+      }
+      .modal-content > div:last-child {
+        position: sticky;
+        bottom: 0;
+        z-index: 8;
+        background: rgba(248,250,252,.96) !important;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        flex-wrap: wrap;
+        gap: .7rem;
+      }
+      .modal-content > div:last-child > .flex {
+        width: 100%;
+        gap: .6rem !important;
+      }
+      .modal-content > div:last-child button {
+        border-radius: .95rem !important;
+      }
+      .modal-content > div:last-child button[type="submit"] {
+        flex: 1;
+      }
+    }
+
+
+  
+
+    /* 手机端统计卡片优化：进入页面即完整看到所有数量，不再依赖横向滑动/点击后才露出 */
+    @media (max-width: 767px) {
+      .mobile-summary-strip {
+        display: grid !important;
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        gap: .38rem !important;
+        overflow: visible !important;
+        padding-bottom: 0 !important;
+        scroll-snap-type: none !important;
+      }
+      .mobile-summary-strip .summary-card-btn {
+        min-width: 0 !important;
+        width: 100% !important;
+        flex: initial !important;
+        padding: .48rem .28rem !important;
+        border-radius: .82rem !important;
+        text-align: center !important;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05) !important;
+      }
+      .mobile-summary-strip .summary-card-btn > div:first-child {
+        display: block !important;
+      }
+      .mobile-summary-strip .summary-card-btn .summary-label {
+        display: block !important;
+        width: 100% !important;
+        font-size: 10px !important;
+        line-height: 1.1 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .mobile-summary-strip .summary-card-btn .summary-value {
+        display: block !important;
+        font-size: 19px !important;
+        line-height: 1.05 !important;
+        margin-top: .22rem !important;
+        min-height: 20px !important;
+        white-space: nowrap !important;
+      }
+      .mobile-summary-strip .summary-card-btn.active {
+        transform: none !important;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, .10), 0 5px 12px rgba(15, 23, 42, 0.06) !important;
+      }
+      .mobile-summary-strip .click-hint { display: none !important; }
+    }
+
+    @media (max-width: 359px) {
+      .mobile-summary-strip {
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        gap: .28rem !important;
+      }
+      .mobile-summary-strip .summary-card-btn {
+        padding: .42rem .18rem !important;
+        border-radius: .72rem !important;
+      }
+      .mobile-summary-strip .summary-card-btn .summary-label { font-size: 9px !important; }
+      .mobile-summary-strip .summary-card-btn .summary-value { font-size: 17px !important; }
+    }
+
   </style>
 </head>
 <body>
@@ -1467,6 +1743,30 @@
                   <h2 className="text-lg font-bold text-slate-800">{editingTask.id ? '编辑事项' : '新增事项'}</h2>
                   <button onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                 </div>
+                {editingTask.id && (
+                  <div className="task-detail-preview">
+                    <div className="task-detail-preview-card">
+                      <div className="mobile-detail-topline">
+                        <span className="mobile-detail-chip status">{getStatusTitle(getBoardColumnKey(editingTask))}</span>
+                        {editingTask.priority && <span className="mobile-detail-chip">{editingTask.priority.replace(' - ', ' ')}</span>}
+                        {editingTask.isUrgent && <span className="mobile-detail-chip urgent">需过目</span>}
+                      </div>
+                      <h3 className="mobile-detail-title">{editingTask.task || '未命名事项'}</h3>
+                      <div className="mobile-detail-meta">
+                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">板块</span><span className="mobile-detail-meta-value">{editingTask.category || '未分类'}</span></div>
+                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">负责人</span><span className="mobile-detail-meta-value">{editingTask.assignee || '未分配'}</span></div>
+                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">开始</span><span className="mobile-detail-meta-value">{editingTask.startDate || '未定'}</span></div>
+                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">截止</span><span className="mobile-detail-meta-value">{editingTask.dueDate || '未定'}</span></div>
+                      </div>
+                      <div className="mobile-progress-reader custom-scrollbar">
+                        <div className="mobile-read-label">最新进展</div>
+                        <p className="mobile-read-text">{editingTask.progress || '暂无最新进展'}</p>
+                      </div>
+                      {editingTask.detail && <div className="mobile-detail-note"><span className="mobile-read-label">内部说明备注</span><br />{editingTask.detail}</div>}
+                      {editingTask.attachmentUrl && <a className="mobile-detail-link" href={editingTask.attachmentUrl} target="_blank" rel="noreferrer">打开相关链接</a>}
+                    </div>
+                  </div>
+                )}
                 <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="md:col-span-2"><label className="block text-[14px] font-semibold text-slate-600 mb-2">事项标题</label><input name="task" defaultValue={editingTask.task || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} required /></div>
@@ -1479,8 +1779,9 @@
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">优先级</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
                   </div>
-                  <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="3" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" disabled={saving}></textarea></div>
-                  <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail || ''} rows="2" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" disabled={saving}></textarea></div>
+                  {editingTask.id && <div className="mobile-edit-hint">上方是手机阅读视图；需要修改时，直接在下面编辑并保存。</div>}
+                  <div className="mobile-field-progress"><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展 / 可编辑</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="6" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" placeholder="写下当前最新进展，支持换行。" disabled={saving}></textarea></div>
+                  <div className="mobile-field-detail"><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail || ''} rows="4" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" placeholder="补充内部备注、风险点或待确认事项。" disabled={saving}></textarea></div>
                   <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
                   <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
                 </form>
