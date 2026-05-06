@@ -310,6 +310,22 @@
         letter-spacing: .01em;
         color: #64748b !important;
       }
+      .modal-content {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      .modal-content form {
+        flex: 0 0 auto !important;
+        overflow: visible !important;
+      }
+      .modal-content > div:last-child {
+        position: sticky;
+        bottom: 0;
+        z-index: 9;
+        background: rgba(248,250,252,.96) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
       .modal-content form > .grid {
         gap: .8rem !important;
       }
@@ -392,27 +408,30 @@
         overflow-wrap: anywhere;
       }
       .mobile-progress-reader {
-        max-height: 34dvh;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        /* 手机端改为自然展开的浅色阅读区，不再做内部锁定滚动框 */
+        max-height: none;
+        overflow: visible;
         border-radius: 1rem;
-        background: #0f172a;
-        color: #e2e8f0;
-        padding: .85rem .9rem;
-        border: 1px solid rgba(15,23,42,.12);
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        color: #334155;
+        padding: .9rem .95rem;
+        border: 1px solid rgba(203,213,225,.95);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
       }
       .mobile-read-label {
         font-size: 11px;
         font-weight: 800;
-        color: #93c5fd;
+        color: #4f46e5;
         margin-bottom: .45rem;
       }
       .mobile-read-text {
         margin: 0;
         white-space: pre-wrap;
         word-break: break-word;
+        overflow-wrap: anywhere;
         font-size: 15px;
         line-height: 1.75;
+        color: #334155;
       }
       .mobile-detail-note {
         margin-top: .75rem;
