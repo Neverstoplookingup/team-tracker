@@ -329,6 +329,9 @@
       .modal-content form > .grid {
         gap: .8rem !important;
       }
+      .modal-content form {
+        gap: 1rem !important;
+      }
       .task-detail-preview {
         display: block;
         padding: .75rem 1rem .9rem;
@@ -338,9 +341,9 @@
       .task-detail-preview-card {
         border: 1px solid rgba(199,210,254,.75);
         border-radius: 1.1rem;
-        padding: .95rem;
+        padding: .9rem .95rem;
         background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
       }
       .mobile-detail-topline {
         display: flex;
@@ -407,31 +410,12 @@
         color: #334155;
         overflow-wrap: anywhere;
       }
-      .mobile-progress-reader {
-        /* 手机端改为自然展开的浅色阅读区，不再做内部锁定滚动框 */
-        max-height: none;
-        overflow: visible;
-        border-radius: 1rem;
-        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-        color: #334155;
-        padding: .9rem .95rem;
-        border: 1px solid rgba(203,213,225,.95);
-        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
-      }
-      .mobile-read-label {
+      .mobile-section-label {
+        display: block;
         font-size: 11px;
         font-weight: 800;
         color: #4f46e5;
         margin-bottom: .45rem;
-      }
-      .mobile-read-text {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        overflow-wrap: anywhere;
-        font-size: 15px;
-        line-height: 1.75;
-        color: #334155;
       }
       .mobile-detail-note {
         margin-top: .75rem;
@@ -460,17 +444,20 @@
       }
       .mobile-edit-hint {
         display: block;
-        margin: .1rem 0 -.15rem;
-        padding: .65rem .75rem;
-        border-radius: .9rem;
-        background: #f8fafc;
+        margin-top: .55rem;
         color: #64748b;
         font-size: 12px;
         line-height: 1.45;
-        border: 1px solid rgba(226,232,240,.95);
+      }
+      .mobile-field-progress {
+        padding: .9rem;
+        border-radius: 1.15rem;
+        background: linear-gradient(180deg, rgba(238,242,255,.58), rgba(255,255,255,.92));
+        border: 1px solid rgba(199,210,254,.70);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
       }
       .mobile-field-progress textarea {
-        min-height: 190px !important;
+        min-height: 220px !important;
         font-size: 16px !important;
         line-height: 1.75 !important;
         padding: 1rem !important;
@@ -569,6 +556,220 @@
       }
       .mobile-summary-strip .summary-card-btn .summary-label { font-size: 9px !important; }
       .mobile-summary-strip .summary-card-btn .summary-value { font-size: 17px !important; }
+    }
+
+
+    /* 手机端进度条优化：不再把电脑端大时间轴硬塞进窄屏，改成完整可见的小时间轴卡片 */
+    .mobile-timeline-view { display: none; }
+    @media (max-width: 767px) {
+      .mobile-timeline-view {
+        display: block;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+      }
+      .mobile-timeline-hero {
+        position: sticky;
+        top: 0;
+        z-index: 12;
+        margin-bottom: .75rem;
+        padding: .7rem .8rem;
+        border-radius: 1rem;
+        background: rgba(255,255,255,.94);
+        border: 1px solid rgba(226,232,240,.92);
+        box-shadow: 0 10px 22px rgba(15, 23, 42, .07);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .mobile-timeline-hero-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        font-size: 13px;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .mobile-timeline-hero-tip {
+        margin-top: .35rem;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #64748b;
+      }
+      .mobile-timeline-range {
+        flex: 0 0 auto;
+        padding: .28rem .5rem;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        color: #4f46e5;
+        background: #eef2ff;
+        border: 1px solid rgba(165,180,252,.72);
+      }
+      .mobile-timeline-category {
+        margin-bottom: .9rem;
+        border-radius: 1.05rem;
+        overflow: hidden;
+        border: 1px solid rgba(226,232,240,.92);
+        background: rgba(255,255,255,.86);
+        box-shadow: 0 10px 22px rgba(15, 23, 42, .055);
+      }
+      .mobile-timeline-category-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .75rem;
+        padding: .72rem .82rem;
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+        border-bottom: 1px solid rgba(226,232,240,.8);
+      }
+      .mobile-timeline-category-name {
+        min-width: 0;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 800;
+        color: #334155;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .mobile-timeline-category-count {
+        flex: 0 0 auto;
+        font-size: 10px;
+        font-weight: 800;
+        color: #64748b;
+        background: #f1f5f9;
+        border: 1px solid rgba(203,213,225,.8);
+        padding: .25rem .5rem;
+        border-radius: 999px;
+      }
+      .mobile-timeline-card {
+        padding: .82rem;
+        border-bottom: 1px solid rgba(226,232,240,.72);
+      }
+      .mobile-timeline-card:last-child { border-bottom: none; }
+      .mobile-timeline-card:active { background: #f8fafc; }
+      .mobile-timeline-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: .7rem;
+        margin-bottom: .52rem;
+      }
+      .mobile-timeline-task-title {
+        min-width: 0;
+        font-size: 14px;
+        line-height: 1.45;
+        font-weight: 800;
+        color: #0f172a;
+        word-break: break-word;
+      }
+      .mobile-timeline-status {
+        flex: 0 0 auto;
+        max-width: 92px;
+        padding: .24rem .48rem;
+        border-radius: 999px;
+        font-size: 10px;
+        line-height: 1.15;
+        font-weight: 800;
+        text-align: center;
+        color: #4f46e5;
+        background: #eef2ff;
+        border: 1px solid rgba(165,180,252,.72);
+      }
+      .mobile-timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        margin-bottom: .65rem;
+      }
+      .mobile-timeline-meta span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: .22rem .46rem;
+        border-radius: .6rem;
+        background: #f8fafc;
+        border: 1px solid rgba(226,232,240,.9);
+        color: #64748b;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .mobile-timeline-track-wrap {
+        position: relative;
+        border-radius: .95rem;
+        background: #f8fafc;
+        border: 1px solid rgba(226,232,240,.95);
+        overflow: hidden;
+      }
+      .mobile-timeline-months {
+        display: flex;
+        height: 24px;
+        border-bottom: 1px solid rgba(226,232,240,.75);
+        background: rgba(255,255,255,.78);
+      }
+      .mobile-timeline-month {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-right: 1px solid rgba(226,232,240,.74);
+        font-size: 9px;
+        font-weight: 800;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mobile-timeline-month:last-child { border-right: none; }
+      .mobile-timeline-track {
+        position: relative;
+        height: 42px;
+        background-image: linear-gradient(90deg, rgba(226,232,240,.72) 1px, transparent 1px);
+        background-size: 18px 100%;
+      }
+      .mobile-timeline-bar {
+        position: absolute;
+        top: 11px;
+        height: 20px;
+        border-radius: 999px;
+        box-shadow: 0 5px 12px rgba(15, 23, 42, .12);
+        display: flex;
+        align-items: center;
+        padding: 0 .45rem;
+        color: white;
+        font-size: 10px;
+        font-weight: 800;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .mobile-timeline-today-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: rgba(239,68,68,.76);
+        box-shadow: 0 0 0 2px rgba(248,113,113,.12);
+        pointer-events: none;
+      }
+      .mobile-timeline-progress-text {
+        margin-top: .55rem;
+        font-size: 12px;
+        line-height: 1.55;
+        color: #475569;
+        background: #f8fafc;
+        border: 1px solid rgba(226,232,240,.88);
+        border-radius: .85rem;
+        padding: .55rem .65rem;
+        word-break: break-word;
+      }
+      .mobile-timeline-empty {
+        padding: 2.5rem 1rem;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+        background: rgba(255,255,255,.86);
+        border: 1px dashed rgba(203,213,225,.92);
+        border-radius: 1rem;
+      }
     }
 
   </style>
@@ -1108,6 +1309,24 @@
     };
 
     const TimelineView = ({ tasks, categories, onEdit }) => {
+      const [isMobileTimeline, setIsMobileTimeline] = useState(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) return false;
+        return window.matchMedia('(max-width: 767px)').matches;
+      });
+
+      useEffect(() => {
+        if (!window.matchMedia) return;
+        const mq = window.matchMedia('(max-width: 767px)');
+        const update = () => setIsMobileTimeline(mq.matches);
+        update();
+        if (mq.addEventListener) mq.addEventListener('change', update);
+        else mq.addListener(update);
+        return () => {
+          if (mq.removeEventListener) mq.removeEventListener('change', update);
+          else mq.removeListener(update);
+        };
+      }, []);
+
       const today = useMemo(() => {
         const d = new Date();
         d.setHours(0, 0, 0, 0);
@@ -1145,9 +1364,87 @@
         return { minDate: minD, monthsArray: mArray, totalDays: mArray.reduce((acc, val) => acc + val.daysInMonth, 0) };
       }, [enrichedTasks, today]);
 
-      const DAY_WIDTH = 4;
-      const leftColWidth = 320;
+      const DAY_WIDTH = isMobileTimeline ? 6 : 4;
+      const leftColWidth = isMobileTimeline ? 142 : 320;
       const todayOffset = (today.getTime() - minDate.getTime()) / 86400000;
+      const todayPct = Math.max(0, Math.min(100, (todayOffset / Math.max(totalDays, 1)) * 100));
+      const hasTodayInRange = todayOffset >= 0 && todayOffset <= totalDays;
+      const visibleCategories = categories.filter(c => c !== 'All');
+
+      const formatShortDate = (date) => {
+        if (!date) return '未定';
+        const d = date instanceof Date ? date : parseDateOnly(date);
+        if (!d || Number.isNaN(d.getTime())) return '未定';
+        return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+      };
+
+      const getTaskTimelineStyle = (task) => {
+        const startDays = (task._start.getTime() - minDate.getTime()) / 86400000;
+        const durationDays = Math.max(1, (task._end.getTime() - task._start.getTime()) / 86400000 + 1);
+        const offsetPct = Math.max(0, Math.min(100, (startDays / Math.max(totalDays, 1)) * 100));
+        const rawWidthPct = (durationDays / Math.max(totalDays, 1)) * 100;
+        const widthPct = Math.max(7, Math.min(100 - offsetPct, rawWidthPct));
+        return { left: `${offsetPct}%`, width: `${Math.max(widthPct, 3)}%` };
+      };
+
+      if (isMobileTimeline) {
+        return (
+          <div className="mobile-timeline-view">
+            <div className="mobile-timeline-hero">
+              <div className="mobile-timeline-hero-title">
+                <span>进度条视图</span>
+                <span className="mobile-timeline-range">{formatShortDate(minDate)} - {formatShortDate(new Date(minDate.getTime() + Math.max(totalDays - 1, 0) * 86400000))}</span>
+              </div>
+              <div className="mobile-timeline-hero-tip">手机端已改为完整可见的小时间轴：每个事项的条形长度代表周期，红线代表今天，点击事项可查看或编辑详情。</div>
+            </div>
+
+            {enrichedTasks.length === 0 ? (
+              <div className="mobile-timeline-empty">当前筛选条件下暂无事项。</div>
+            ) : visibleCategories.map(catName => {
+              const catTasks = sortTasks(enrichedTasks.filter(t => t.category === catName));
+              if (catTasks.length === 0) return null;
+              return (
+                <section key={`mobile-timeline-${catName}`} className="mobile-timeline-category">
+                  <div className="mobile-timeline-category-head">
+                    <div className="mobile-timeline-category-name">{catName}</div>
+                    <div className="mobile-timeline-category-count">{catTasks.length} 项</div>
+                  </div>
+                  {catTasks.map(task => {
+                    const config = COLUMN_CONFIG[getBoardColumnKey(task)] || COLUMN_CONFIG['To Do'];
+                    return (
+                      <article key={task.id} className="mobile-timeline-card" onClick={() => onEdit(task)}>
+                        <div className="mobile-timeline-card-top">
+                          <div className="mobile-timeline-task-title">{task.task || '未命名事项'}</div>
+                          <div className="mobile-timeline-status">{config.title}</div>
+                        </div>
+                        <div className="mobile-timeline-meta">
+                          <span>负责人：{task.assignee || '未分配'}</span>
+                          <span>{formatShortDate(task._start)} - {formatShortDate(task._end)}</span>
+                          {task.priority && <span>{task.priority.replace(' - ', ' ')}</span>}
+                        </div>
+                        <div className="mobile-timeline-track-wrap">
+                          <div className="mobile-timeline-months">
+                            {monthsArray.map((m, i) => (
+                              <div key={i} className="mobile-timeline-month" style={{ width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` }}>{m.month + 1}月</div>
+                            ))}
+                          </div>
+                          <div className="mobile-timeline-track">
+                            {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
+                            <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)}>
+                              {task.progress || config.title}
+                            </div>
+                          </div>
+                        </div>
+                        {task.progress && <div className="mobile-timeline-progress-text line-clamp-2">{task.progress}</div>}
+                      </article>
+                    );
+                  })}
+                </section>
+              );
+            })}
+          </div>
+        );
+      }
 
       return (
         <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
@@ -1164,7 +1461,7 @@
                   {monthsArray.map((m, i) => <div key={i} className="border-r border-slate-100 h-full box-border" style={{ width: m.daysInMonth * DAY_WIDTH }}></div>)}
                 </div>
                 {todayOffset >= 0 && todayOffset <= totalDays && <div className="absolute top-0 bottom-0 w-[2px] bg-red-400/70 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH }}></div>}
-                {categories.filter(c => c !== 'All').map(catName => {
+                {visibleCategories.map(catName => {
                   const catTasks = sortTasks(enrichedTasks.filter(t => t.category === catName));
                   if (catTasks.length === 0) return null;
                   return (
@@ -1777,11 +2074,7 @@
                         <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">开始</span><span className="mobile-detail-meta-value">{editingTask.startDate || '未定'}</span></div>
                         <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">截止</span><span className="mobile-detail-meta-value">{editingTask.dueDate || '未定'}</span></div>
                       </div>
-                      <div className="mobile-progress-reader custom-scrollbar">
-                        <div className="mobile-read-label">最新进展</div>
-                        <p className="mobile-read-text">{editingTask.progress || '暂无最新进展'}</p>
-                      </div>
-                      {editingTask.detail && <div className="mobile-detail-note"><span className="mobile-read-label">内部说明备注</span><br />{editingTask.detail}</div>}
+                      {editingTask.detail && <div className="mobile-detail-note"><span className="mobile-section-label">内部说明备注</span><br />{editingTask.detail}</div>}
                       {editingTask.attachmentUrl && <a className="mobile-detail-link" href={editingTask.attachmentUrl} target="_blank" rel="noreferrer">打开相关链接</a>}
                     </div>
                   </div>
@@ -1798,8 +2091,7 @@
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">优先级</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
                   </div>
-                  {editingTask.id && <div className="mobile-edit-hint">上方是手机阅读视图；需要修改时，直接在下面编辑并保存。</div>}
-                  <div className="mobile-field-progress"><label className="block text-[14px] font-semibold text-slate-600 mb-2">最新进展 / 可编辑</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="6" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" placeholder="写下当前最新进展，支持换行。" disabled={saving}></textarea></div>
+                  <div className="mobile-field-progress"><label className="block text-[14px] font-semibold text-slate-700 mb-2">最新进展 / 可编辑</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="7" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" placeholder="写下当前最新进展，支持换行。" disabled={saving}></textarea><div className="mobile-edit-hint">这里就是唯一的最新进展区域：可直接阅读，也可以点击修改后保存。</div></div>
                   <div className="mobile-field-detail"><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail || ''} rows="4" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" placeholder="补充内部备注、风险点或待确认事项。" disabled={saving}></textarea></div>
                   <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
                   <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
