@@ -567,17 +567,12 @@
         padding-bottom: calc(1rem + env(safe-area-inset-bottom));
       }
       .mobile-timeline-hero {
-        position: sticky;
-        top: 0;
-        z-index: 12;
-        margin-bottom: .75rem;
-        padding: .7rem .8rem;
-        border-radius: 1rem;
-        background: rgba(255,255,255,.94);
-        border: 1px solid rgba(226,232,240,.92);
-        box-shadow: 0 10px 22px rgba(15, 23, 42, .07);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        position: static;
+        margin-bottom: .6rem;
+        padding: .35rem .1rem .45rem;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
       }
       .mobile-timeline-hero-title {
         display: flex;
@@ -588,22 +583,8 @@
         font-weight: 800;
         color: #0f172a;
       }
-      .mobile-timeline-hero-tip {
-        margin-top: .35rem;
-        font-size: 11px;
-        line-height: 1.45;
-        color: #64748b;
-      }
-      .mobile-timeline-range {
-        flex: 0 0 auto;
-        padding: .28rem .5rem;
-        border-radius: 999px;
-        font-size: 10px;
-        font-weight: 800;
-        color: #4f46e5;
-        background: #eef2ff;
-        border: 1px solid rgba(165,180,252,.72);
-      }
+      .mobile-timeline-hero-tip { display: none; }
+      .mobile-timeline-range { display: none; }
       .mobile-timeline-category {
         margin-bottom: .9rem;
         border-radius: 1.05rem;
@@ -702,6 +683,7 @@
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
+        touch-action: pan-x pan-y;
       }
       .mobile-timeline-track-wrap::-webkit-scrollbar { display: none; }
       .mobile-timeline-track-inner {
@@ -767,17 +749,7 @@
         box-shadow: 0 0 0 2px rgba(248,113,113,.12);
         pointer-events: none;
       }
-      .mobile-timeline-progress-text {
-        margin-top: .55rem;
-        font-size: 12px;
-        line-height: 1.55;
-        color: #475569;
-        background: #f8fafc;
-        border: 1px solid rgba(226,232,240,.88);
-        border-radius: .85rem;
-        padding: .55rem .65rem;
-        word-break: break-word;
-      }
+      .mobile-timeline-progress-text { display: none; }
       .mobile-timeline-empty {
         padding: 2.5rem 1rem;
         text-align: center;
@@ -1373,6 +1345,19 @@
         minD = new Date(minD.getFullYear(), minD.getMonth() - 1, 1);
         maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0);
 
+        if (isMobileTimeline) {
+          // 手机端：默认保持约 8 个月的可视窗口；如果存在未来任务，时间轴自动向未来延展，避免把未来项目压扁。
+          const activeOrFutureStarts = enrichedTasks
+            .filter(t => t._end.getTime() >= today.getTime() || t._start.getTime() >= today.getTime())
+            .map(t => t._start.getTime());
+
+          if (activeOrFutureStarts.length > 0) {
+            const anchorT = Math.min(today.getTime(), Math.min(...activeOrFutureStarts));
+            const anchorD = new Date(anchorT);
+            minD = new Date(anchorD.getFullYear(), anchorD.getMonth() - 1, 1);
+          }
+        }
+
         const mobileVisibleEnd = new Date(minD.getFullYear(), minD.getMonth() + MOBILE_VISIBLE_MONTHS, 0);
         const computedMobileViewportDays = Math.max(1, Math.round((mobileVisibleEnd.getTime() - minD.getTime()) / 86400000) + 1);
         if (isMobileTimeline && maxD < mobileVisibleEnd) {
@@ -1421,10 +1406,8 @@
           <div className="mobile-timeline-view">
             <div className="mobile-timeline-hero">
               <div className="mobile-timeline-hero-title">
-                <span>进度条视图</span>
-                <span className="mobile-timeline-range">{formatShortDate(minDate)} - {formatShortDate(new Date(minDate.getTime() + Math.max(totalDays - 1, 0) * 86400000))}</span>
+                <span>进度条</span>
               </div>
-              <div className="mobile-timeline-hero-tip">手机端默认按约 8 个月显示时间轴；超过 8 个月的项目不会被压扁，可在时间轴区域左右滑动查看完整周期。</div>
             </div>
 
             {enrichedTasks.length === 0 ? (
@@ -1460,14 +1443,11 @@
                             </div>
                             <div className="mobile-timeline-track">
                               {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
-                              <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)}>
-                                {task.progress || config.title}
-                              </div>
+                              <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)} aria-label={`${task.task || '未命名事项'}：${config.title}`}></div>
                             </div>
                           </div>
                         </div>
                         {mobileNeedsHorizontalScroll && <div className="mobile-timeline-scroll-hint">左右滑动查看超过 8 个月的时间轴 →</div>}
-                        {task.progress && <div className="mobile-timeline-progress-text line-clamp-2">{task.progress}</div>}
                       </article>
                     );
                   })}
