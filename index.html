@@ -594,13 +594,38 @@
         box-shadow: 0 10px 22px rgba(15, 23, 42, .055);
       }
       .mobile-timeline-category-head {
+        width: 100%;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: .75rem;
         padding: .72rem .82rem;
         background: linear-gradient(180deg, #ffffff, #f8fafc);
+        border: 0;
         border-bottom: 1px solid rgba(226,232,240,.8);
+        text-align: left;
+      }
+      .mobile-timeline-category-head:active {
+        background: linear-gradient(180deg, #f8fafc, #f1f5f9);
+      }
+      .mobile-timeline-category-main {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+      }
+      .mobile-timeline-category-chevron {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        transition: transform .2s ease;
+      }
+      .mobile-timeline-category-chevron.is-collapsed {
+        transform: rotate(-90deg);
       }
       .mobile-timeline-category-name {
         min-width: 0;
@@ -749,7 +774,21 @@
         box-shadow: 0 0 0 2px rgba(248,113,113,.12);
         pointer-events: none;
       }
-      .mobile-timeline-progress-text { display: none; }
+      .mobile-timeline-progress-text {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: rgba(255,255,255,.96);
+        text-shadow: 0 1px 2px rgba(15,23,42,.25);
+      }
+      .mobile-timeline-category-body {
+        display: block;
+      }
+      .mobile-timeline-category-body.is-collapsed {
+        display: none;
+      }
       .mobile-timeline-empty {
         padding: 2.5rem 1rem;
         text-align: center;
@@ -1302,6 +1341,7 @@
         if (typeof window === 'undefined' || !window.matchMedia) return false;
         return window.matchMedia('(max-width: 767px)').matches;
       });
+      const [mobileCollapsedCategories, setMobileCollapsedCategories] = useState({});
 
       useEffect(() => {
         if (!window.matchMedia) return;
@@ -1315,6 +1355,10 @@
           else mq.removeListener(update);
         };
       }, []);
+
+      const toggleMobileCategory = (catName) => {
+        setMobileCollapsedCategories(prev => ({ ...prev, [catName]: !prev[catName] }));
+      };
 
       // 手机端默认按 8 个月作为一屏比例；超过 8 个月时不压缩，改为横向滑动。
       const MOBILE_VISIBLE_MONTHS = 8;
@@ -1415,42 +1459,51 @@
             ) : visibleCategories.map(catName => {
               const catTasks = sortTasks(enrichedTasks.filter(t => t.category === catName));
               if (catTasks.length === 0) return null;
+              const isCollapsed = !!mobileCollapsedCategories[catName];
               return (
                 <section key={`mobile-timeline-${catName}`} className="mobile-timeline-category">
-                  <div className="mobile-timeline-category-head">
-                    <div className="mobile-timeline-category-name">{catName}</div>
+                  <button type="button" className="mobile-timeline-category-head" onClick={() => toggleMobileCategory(catName)}>
+                    <div className="mobile-timeline-category-main">
+                      <span className={`mobile-timeline-category-chevron ${isCollapsed ? 'is-collapsed' : ''}`}>⌄</span>
+                      <div className="mobile-timeline-category-name">{catName}</div>
+                    </div>
                     <div className="mobile-timeline-category-count">{catTasks.length} 项</div>
-                  </div>
-                  {catTasks.map(task => {
-                    const config = COLUMN_CONFIG[getBoardColumnKey(task)] || COLUMN_CONFIG['To Do'];
-                    return (
-                      <article key={task.id} className="mobile-timeline-card" onClick={() => onEdit(task)}>
-                        <div className="mobile-timeline-card-top">
-                          <div className="mobile-timeline-task-title">{task.task || '未命名事项'}</div>
-                          <div className="mobile-timeline-status">{config.title}</div>
-                        </div>
-                        <div className="mobile-timeline-meta">
-                          <span>负责人：{task.assignee || '未分配'}</span>
-                          <span>{formatShortDate(task._start)} - {formatShortDate(task._end)}</span>
-                          {task.priority && <span>{task.priority.replace(' - ', ' ')}</span>}
-                        </div>
-                        <div className="mobile-timeline-track-wrap">
-                          <div className="mobile-timeline-track-inner" style={{ width: `${mobileTrackWidthPct}%` }}>
-                            <div className="mobile-timeline-months">
-                              {monthsArray.map((m, i) => (
-                                <div key={i} className="mobile-timeline-month" style={{ width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` }}>{m.month + 1}月</div>
-                              ))}
-                            </div>
-                            <div className="mobile-timeline-track">
-                              {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
-                              <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)} aria-label={`${task.task || '未命名事项'}：${config.title}`}></div>
+                  </button>
+                  <div className={`mobile-timeline-category-body ${isCollapsed ? 'is-collapsed' : ''}`}>
+                    {catTasks.map(task => {
+                      const config = COLUMN_CONFIG[getBoardColumnKey(task)] || COLUMN_CONFIG['To Do'];
+                      const progressText = (task.progress && task.progress.trim()) || config.title || '查看详情';
+                      return (
+                        <article key={task.id} className="mobile-timeline-card" onClick={() => onEdit(task)}>
+                          <div className="mobile-timeline-card-top">
+                            <div className="mobile-timeline-task-title">{task.task || '未命名事项'}</div>
+                            <div className="mobile-timeline-status">{config.title}</div>
+                          </div>
+                          <div className="mobile-timeline-meta">
+                            <span>负责人：{task.assignee || '未分配'}</span>
+                            <span>{formatShortDate(task._start)} - {formatShortDate(task._end)}</span>
+                            {task.priority && <span>{task.priority.replace(' - ', ' ')}</span>}
+                          </div>
+                          <div className="mobile-timeline-track-wrap">
+                            <div className="mobile-timeline-track-inner" style={{ width: `${mobileTrackWidthPct}%` }}>
+                              <div className="mobile-timeline-months">
+                                {monthsArray.map((m, i) => (
+                                  <div key={i} className="mobile-timeline-month" style={{ width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` }}>{m.month + 1}月</div>
+                                ))}
+                              </div>
+                              <div className="mobile-timeline-track">
+                                {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
+                                <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)} aria-label={`${task.task || '未命名事项'}：${config.title}`}>
+                                  <span className="mobile-timeline-progress-text">{progressText}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        {mobileNeedsHorizontalScroll && <div className="mobile-timeline-scroll-hint">左右滑动查看超过 8 个月的时间轴 →</div>}
-                      </article>
-                    );
-                  })}
+                          {mobileNeedsHorizontalScroll && <div className="mobile-timeline-scroll-hint">左右滑动查看超过 8 个月的时间轴 →</div>}
+                        </article>
+                      );
+                    })}
+                  </div>
                 </section>
               );
             })}
