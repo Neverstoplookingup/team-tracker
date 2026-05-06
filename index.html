@@ -698,7 +698,24 @@
         border-radius: .95rem;
         background: #f8fafc;
         border: 1px solid rgba(226,232,240,.95);
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .mobile-timeline-track-wrap::-webkit-scrollbar { display: none; }
+      .mobile-timeline-track-inner {
+        min-width: 100%;
+      }
+      .mobile-timeline-scroll-hint {
+        margin-top: .42rem;
+        font-size: 10px;
+        line-height: 1.35;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: .25rem;
       }
       .mobile-timeline-months {
         display: flex;
@@ -1327,6 +1344,9 @@
         };
       }, []);
 
+      // 手机端默认按 8 个月作为一屏比例；超过 8 个月时不压缩，改为横向滑动。
+      const MOBILE_VISIBLE_MONTHS = 8;
+
       const today = useMemo(() => {
         const d = new Date();
         d.setHours(0, 0, 0, 0);
@@ -1343,7 +1363,7 @@
         return { ...t, _start: s, _end: e };
       }), [tasks, today]);
 
-      const { minDate, monthsArray, totalDays } = useMemo(() => {
+      const { minDate, monthsArray, totalDays, mobileViewportDays } = useMemo(() => {
         let minT = Math.min(...enrichedTasks.map(t => t._start.getTime()));
         let maxT = Math.max(...enrichedTasks.map(t => t._end.getTime()));
         if (!Number.isFinite(minT)) minT = today.getTime();
@@ -1352,6 +1372,13 @@
         let maxD = new Date(maxT);
         minD = new Date(minD.getFullYear(), minD.getMonth() - 1, 1);
         maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0);
+
+        const mobileVisibleEnd = new Date(minD.getFullYear(), minD.getMonth() + MOBILE_VISIBLE_MONTHS, 0);
+        const computedMobileViewportDays = Math.max(1, Math.round((mobileVisibleEnd.getTime() - minD.getTime()) / 86400000) + 1);
+        if (isMobileTimeline && maxD < mobileVisibleEnd) {
+          maxD = mobileVisibleEnd;
+        }
+
         const mArray = [];
         let curr = new Date(minD);
         while (curr <= maxD) {
@@ -1361,14 +1388,16 @@
           mArray.push({ year: y, month: m, daysInMonth: days });
           curr.setMonth(m + 1);
         }
-        return { minDate: minD, monthsArray: mArray, totalDays: mArray.reduce((acc, val) => acc + val.daysInMonth, 0) };
-      }, [enrichedTasks, today]);
+        return { minDate: minD, monthsArray: mArray, totalDays: mArray.reduce((acc, val) => acc + val.daysInMonth, 0), mobileViewportDays: computedMobileViewportDays };
+      }, [enrichedTasks, today, isMobileTimeline]);
 
       const DAY_WIDTH = isMobileTimeline ? 6 : 4;
       const leftColWidth = isMobileTimeline ? 142 : 320;
       const todayOffset = (today.getTime() - minDate.getTime()) / 86400000;
       const todayPct = Math.max(0, Math.min(100, (todayOffset / Math.max(totalDays, 1)) * 100));
       const hasTodayInRange = todayOffset >= 0 && todayOffset <= totalDays;
+      const mobileTrackWidthPct = Math.max(100, (totalDays / Math.max(mobileViewportDays, 1)) * 100);
+      const mobileNeedsHorizontalScroll = mobileTrackWidthPct > 101;
       const visibleCategories = categories.filter(c => c !== 'All');
 
       const formatShortDate = (date) => {
@@ -1395,7 +1424,7 @@
                 <span>进度条视图</span>
                 <span className="mobile-timeline-range">{formatShortDate(minDate)} - {formatShortDate(new Date(minDate.getTime() + Math.max(totalDays - 1, 0) * 86400000))}</span>
               </div>
-              <div className="mobile-timeline-hero-tip">手机端已改为完整可见的小时间轴：每个事项的条形长度代表周期，红线代表今天，点击事项可查看或编辑详情。</div>
+              <div className="mobile-timeline-hero-tip">手机端默认按约 8 个月显示时间轴；超过 8 个月的项目不会被压扁，可在时间轴区域左右滑动查看完整周期。</div>
             </div>
 
             {enrichedTasks.length === 0 ? (
@@ -1423,18 +1452,21 @@
                           {task.priority && <span>{task.priority.replace(' - ', ' ')}</span>}
                         </div>
                         <div className="mobile-timeline-track-wrap">
-                          <div className="mobile-timeline-months">
-                            {monthsArray.map((m, i) => (
-                              <div key={i} className="mobile-timeline-month" style={{ width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` }}>{m.month + 1}月</div>
-                            ))}
-                          </div>
-                          <div className="mobile-timeline-track">
-                            {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
-                            <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)}>
-                              {task.progress || config.title}
+                          <div className="mobile-timeline-track-inner" style={{ width: `${mobileTrackWidthPct}%` }}>
+                            <div className="mobile-timeline-months">
+                              {monthsArray.map((m, i) => (
+                                <div key={i} className="mobile-timeline-month" style={{ width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` }}>{m.month + 1}月</div>
+                              ))}
+                            </div>
+                            <div className="mobile-timeline-track">
+                              {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
+                              <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)}>
+                                {task.progress || config.title}
+                              </div>
                             </div>
                           </div>
                         </div>
+                        {mobileNeedsHorizontalScroll && <div className="mobile-timeline-scroll-hint">左右滑动查看超过 8 个月的时间轴 →</div>}
                         {task.progress && <div className="mobile-timeline-progress-text line-clamp-2">{task.progress}</div>}
                       </article>
                     );
