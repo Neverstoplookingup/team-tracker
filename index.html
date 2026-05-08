@@ -800,6 +800,196 @@
       }
     }
 
+
+    /* 访问码入口：电脑/手机自适应比例 */
+    .access-gate-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(15, 23, 42, .40);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .access-gate-page {
+      min-height: 100vh;
+      min-height: 100dvh;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background:
+        radial-gradient(circle at top left, rgba(99, 102, 241, 0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 24%),
+        linear-gradient(180deg, #f8fbff 0%, #f4f7fb 42%, #eef3f9 100%);
+      overflow-y: auto;
+    }
+    .access-gate-card {
+      width: 100%;
+      max-width: 28rem;
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid rgba(255, 255, 255, .72);
+      background: #ffffff;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, .22);
+    }
+    .access-gate-header {
+      padding: 1.5rem 1.5rem 1rem;
+      background: linear-gradient(135deg, #eef2ff 0%, #ffffff 55%, #f0f9ff 100%);
+      border-bottom: 1px solid rgba(226, 232, 240, .78);
+    }
+    .access-gate-title {
+      font-size: 1.25rem;
+      line-height: 1.55rem;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .access-gate-desc {
+      margin-top: .5rem;
+      font-size: .875rem;
+      line-height: 1.5rem;
+      color: #64748b;
+    }
+    .access-gate-form {
+      padding: 1.25rem 1.5rem 1.5rem;
+    }
+    .access-gate-input {
+      width: 100%;
+      border-radius: 1rem;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      padding: .8rem 1rem;
+      font-size: .875rem;
+      color: #334155;
+      outline: none;
+      transition: all .18s ease;
+    }
+    .access-gate-input:focus {
+      border-color: #818cf8;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, .10);
+    }
+    .access-gate-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: .75rem;
+    }
+    .access-gate-secondary,
+    .access-gate-primary {
+      border-radius: 1rem;
+      padding: .65rem 1rem;
+      font-size: .875rem;
+      line-height: 1.25rem;
+      font-weight: 700;
+      transition: all .18s ease;
+    }
+    .access-gate-secondary {
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #475569;
+    }
+    .access-gate-secondary:hover { background: #f8fafc; }
+    .access-gate-primary {
+      background: #4f46e5;
+      color: #ffffff;
+      box-shadow: 0 8px 18px rgba(79, 70, 229, .20);
+    }
+    .access-gate-primary:hover { background: #4338ca; }
+
+    @media (max-width: 767px) {
+      .access-gate-page {
+        align-items: center;
+        justify-content: center;
+        padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1.1rem + env(safe-area-inset-bottom));
+        min-height: 100dvh;
+        overflow-y: auto;
+      }
+      .access-gate-overlay {
+        align-items: center;
+        justify-content: center;
+        padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1.1rem + env(safe-area-inset-bottom));
+        min-height: 100dvh;
+        overflow-y: auto;
+      }
+      .access-gate-card {
+        width: min(100%, 360px);
+        max-width: 360px;
+        border-radius: 1.45rem;
+        box-shadow: 0 18px 56px rgba(15, 23, 42, .20);
+      }
+      .access-gate-header {
+        padding: 1.2rem 1.15rem .9rem;
+      }
+      .access-gate-title {
+        font-size: 1.12rem;
+        line-height: 1.45rem;
+      }
+      .access-gate-desc {
+        margin-top: .45rem;
+        font-size: .82rem;
+        line-height: 1.35rem;
+      }
+      .access-gate-form {
+        padding: 1rem 1.15rem 1.15rem;
+      }
+      .access-gate-input {
+        min-height: 3rem;
+        border-radius: 1rem;
+        padding: .82rem .95rem;
+        font-size: 16px; /* 避免 iOS 聚焦时页面自动放大 */
+      }
+      .access-gate-actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: .65rem;
+      }
+      .access-gate-secondary,
+      .access-gate-primary {
+        width: 100%;
+        min-height: 2.9rem;
+        border-radius: 1rem;
+        padding: .78rem 1rem;
+        font-size: .92rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .access-gate-card {
+        width: 100%;
+        border-radius: 1.2rem;
+      }
+      .access-gate-header {
+        padding: 1.05rem 1rem .82rem;
+      }
+      .access-gate-form {
+        padding: .9rem 1rem 1rem;
+      }
+      .access-gate-title {
+        font-size: 1.05rem;
+      }
+      .access-gate-desc {
+        font-size: .8rem;
+      }
+    }
+
+    @media (max-height: 560px) and (max-width: 767px) {
+      .access-gate-page,
+      .access-gate-overlay {
+        align-items: flex-start;
+      }
+      .access-gate-card {
+        margin-top: .5rem;
+        margin-bottom: .5rem;
+      }
+    }
+
+
   </style>
 </head>
 <body>
@@ -990,6 +1180,54 @@
     const EDITABLE_STATUS_OPTIONS = ['To Do', 'In progress', 'Pending', 'Done'];
     const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
     const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
+
+    // 前端板块级协作权限：不改 Firebase，只控制页面可见/可编辑/可删除范围。
+    // 重要：这不是数据库安全权限；懂技术的人仍可能绕过前端限制。
+    const ACCESS_PROFILES = {
+      ADMIN: {
+        label: '管理员',
+        categories: null,
+        canEdit: true,
+        canDelete: true,
+        canExport: true,
+        defaultCategory: ''
+      },
+      GAREA: {
+        label: 'GR 工作区',
+        categories: ['GR'],
+        canEdit: true,
+        canDelete: true,
+        canExport: false,
+        defaultCategory: 'GR'
+      },
+      HCOBV: {
+        label: 'HC&OBV 工作区',
+        categories: ['HC&OBV'],
+        canEdit: true,
+        canDelete: true,
+        canExport: false,
+        defaultCategory: 'HC&OBV'
+      },
+      OPH: {
+        label: 'OPH 工作区',
+        categories: ['OPH'],
+        canEdit: true,
+        canDelete: true,
+        canExport: false,
+        defaultCategory: 'OPH'
+      }
+    };
+
+    const normalizeAccessCode = (value) => String(value || '').trim().toUpperCase();
+
+    const getStoredAccessCode = () => {
+      // 只允许 URL 中明确带 access 参数时自动进入；否则必须先输入访问码。
+      // 不再从 localStorage 自动恢复，避免上次管理员登录后下次打开直接看到全部板块。
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = normalizeAccessCode(params.get('access'));
+      if (ACCESS_PROFILES[fromUrl]) return fromUrl;
+      return '';
+    };
 
     const FIREBASE_CLIENT_TIMEOUT_MS = 10000;
 
@@ -1273,7 +1511,7 @@
                   <CategoryAccordionGroup
                     key={`done-${category}`}
                     category={category}
-                    tasks={tasks.filter(t => (t.category || '未分类') === category)}
+                    tasks={tasks.filter(t => normalizeCategory(t.category) === category)}
                     onEdit={onEdit}
                     defaultExpanded={false}
                   />
@@ -1457,7 +1695,7 @@
             {enrichedTasks.length === 0 ? (
               <div className="mobile-timeline-empty">当前筛选条件下暂无事项。</div>
             ) : visibleCategories.map(catName => {
-              const catTasks = sortTasks(enrichedTasks.filter(t => t.category === catName));
+              const catTasks = sortTasks(enrichedTasks.filter(t => normalizeCategory(t.category) === catName));
               if (catTasks.length === 0) return null;
               const isCollapsed = !!mobileCollapsedCategories[catName];
               return (
@@ -1527,7 +1765,7 @@
                 </div>
                 {todayOffset >= 0 && todayOffset <= totalDays && <div className="absolute top-0 bottom-0 w-[2px] bg-red-400/70 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH }}></div>}
                 {visibleCategories.map(catName => {
-                  const catTasks = sortTasks(enrichedTasks.filter(t => t.category === catName));
+                  const catTasks = sortTasks(enrichedTasks.filter(t => normalizeCategory(t.category) === catName));
                   if (catTasks.length === 0) return null;
                   return (
                     <div key={catName} className="border-b border-slate-200 relative z-10">
@@ -1637,6 +1875,87 @@
       const [draggedOverCol, setDraggedOverCol] = useState(null);
       const [editingTask, setEditingTask] = useState(null);
       const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
+      const [accessCode, setAccessCode] = useState(getStoredAccessCode);
+      const [showAccessModal, setShowAccessModal] = useState(() => !getStoredAccessCode());
+      const [accessInput, setAccessInput] = useState('');
+      const [accessInputError, setAccessInputError] = useState('');
+
+      const accessProfile = useMemo(() => {
+        const profile = ACCESS_PROFILES[accessCode];
+        if (profile) {
+          return { code: accessCode, ...profile };
+        }
+        return {
+          code: '',
+          label: '未进入工作区',
+          categories: [],
+          canEdit: false,
+          canDelete: false,
+          canExport: false,
+          defaultCategory: ''
+        };
+      }, [accessCode]);
+      const allowedCategories = Array.isArray(accessProfile.categories) ? accessProfile.categories : [];
+      const isRestrictedView = !!accessCode && Array.isArray(accessProfile.categories);
+
+      const visibleTasks = useMemo(() => {
+        if (!accessCode) return [];
+        if (!isRestrictedView) return tasks;
+        return tasks.filter(t => allowedCategories.includes(normalizeCategory(t.category)));
+      }, [tasks, accessCode, isRestrictedView, allowedCategories]);
+
+      const canAccessTask = (task) => {
+        if (!task) return false;
+        if (!isRestrictedView) return true;
+        return allowedCategories.includes(normalizeCategory(task.category));
+      };
+
+      const canEditTask = (task) => accessProfile.canEdit && canAccessTask(task);
+      const canDeleteTask = (task) => accessProfile.canDelete && canAccessTask(task);
+
+      const getDefaultCategoryForAccess = () => {
+        if (!isRestrictedView) return filters.category !== 'All' ? filters.category : '';
+        if (filters.category !== 'All' && allowedCategories.includes(filters.category)) return filters.category;
+        return accessProfile.defaultCategory || allowedCategories[0] || '';
+      };
+
+      const applyAccessCode = (rawCode) => {
+        const normalizedCode = normalizeAccessCode(rawCode);
+        if (!ACCESS_PROFILES[normalizedCode]) {
+          setAccessInputError('访问码不正确，请重新输入。');
+          return false;
+        }
+        setAccessCode(normalizedCode);
+        setShowAccessModal(false);
+        setLoading(true);
+        setAccessInput('');
+        setAccessInputError('');
+        setFilters(prev => ({ ...prev, category: 'All', assignee: 'All', status: 'All' }));
+        setEditingTask(null);
+        return true;
+      };
+
+      const openAccessModal = () => {
+        setAccessInput('');
+        setAccessInputError('');
+        setShowAccessModal(true);
+      };
+
+      const closeAccessModal = () => {
+        if (!accessCode) return;
+        setShowAccessModal(false);
+        setAccessInput('');
+        setAccessInputError('');
+      };
+
+      const handleAccessSubmit = (e) => {
+        e.preventDefault();
+        applyAccessCode(accessInput);
+      };
+
+      const switchAccessCode = () => {
+        openAccessModal();
+      };
 
       const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
       const getTasksCollectionRef = () => window.FB?.db ? window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks') : null;
@@ -1722,6 +2041,14 @@
       }, []);
 
       useEffect(() => {
+        if (!accessCode) {
+          setLoading(false);
+          setTasks([]);
+          setSyncMode('locked');
+          setConnectionNotice('');
+          return;
+        }
+
         if (!authReady) return;
 
         if (!window.FB?.db || !window.FB?.auth?.currentUser) {
@@ -1780,20 +2107,26 @@
           if (snapshotTimer) clearTimeout(snapshotTimer);
           if (unsub) unsub();
         };
-      }, [authReady, deployAppId]);
+      }, [authReady, deployAppId, accessCode]);
 
-      const categories = useMemo(() => ['All', ...new Set(tasks.map(t => t.category).filter(Boolean).sort())], [tasks]);
-      const assignees = useMemo(() => ['All', ...new Set(tasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))], [tasks]);
+      const categories = useMemo(() => {
+        const baseCategories = isRestrictedView
+          ? allowedCategories
+          : [...new Set(visibleTasks.map(t => normalizeCategory(t.category)).filter(Boolean).sort())];
+        return ['All', ...baseCategories];
+      }, [visibleTasks, isRestrictedView, allowedCategories]);
+
+      const assignees = useMemo(() => ['All', ...new Set(visibleTasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))], [visibleTasks]);
       const statusOptions = ['All', 'Need Attention', 'In progress', 'To Do', 'Pending', 'Overdue', 'Done'];
 
       const scopedTasks = useMemo(() => {
-        return [...tasks].filter(t => {
+        return [...visibleTasks].filter(t => {
           const matchSearch = `${t.task || ''} ${t.detail || ''} ${t.progress || ''} ${t.assignee || ''}`.toLowerCase().includes(filters.search.toLowerCase());
-          const matchCat = filters.category === 'All' || t.category === filters.category;
+          const matchCat = filters.category === 'All' || normalizeCategory(t.category) === filters.category;
           const matchAssignee = filters.assignee === 'All' || (t.assignee && t.assignee.includes(filters.assignee));
           return matchSearch && matchCat && matchAssignee;
         });
-      }, [tasks, filters.search, filters.category, filters.assignee]);
+      }, [visibleTasks, filters.search, filters.category, filters.assignee]);
 
       const filteredTasks = useMemo(() => {
         return scopedTasks.filter(t => filters.status === 'All' || getBoardColumnKey(t) === filters.status);
@@ -1810,27 +2143,52 @@
 
       const completedArchiveTasks = useMemo(() => sortTasks(filteredTasks.filter(t => getBoardColumnKey(t) === 'Done')), [filteredTasks]);
 
-      const openNewTask = () => setEditingTask({
-        category: filters.category !== 'All' ? filters.category : '',
-        task: '',
-        detail: '',
-        progress: '',
-        status: 'To Do',
-        priority: 'P2 - 正常',
-        isUrgent: false,
-        assignee: '',
-        startDate: '',
-        dueDate: '',
-        attachmentUrl: ''
-      });
+      const openNewTask = () => {
+        if (!accessProfile.canEdit) {
+          alert('当前访问权限不能新增事项。');
+          return;
+        }
+        setEditingTask({
+          category: getDefaultCategoryForAccess(),
+          task: '',
+          detail: '',
+          progress: '',
+          status: 'To Do',
+          priority: 'P2 - 正常',
+          isUrgent: false,
+          assignee: '',
+          startDate: '',
+          dueDate: '',
+          attachmentUrl: ''
+        });
+      };
 
       const handleSaveTask = async (e) => {
         e.preventDefault();
+        if (!accessProfile.canEdit) {
+          alert('当前访问权限不能新增或编辑事项。');
+          return;
+        }
         const formData = new FormData(e.target);
         const taskId = editingTask?.id || generateId();
+        const originalTask = editingTask?.id ? tasks.find(t => t.id === taskId) : null;
+        if (editingTask?.id && !canEditTask(originalTask)) {
+          alert('当前访问权限不能编辑这个板块的事项。');
+          return;
+        }
+
+        const submittedCategory = normalizeCategory(formData.get('category'));
+        if (isRestrictedView && submittedCategory && !allowedCategories.includes(submittedCategory)) {
+          alert(`当前访问码只能保存到：${allowedCategories.join('、')}`);
+          return;
+        }
+        const finalCategory = isRestrictedView
+          ? (submittedCategory || accessProfile.defaultCategory || allowedCategories[0] || '未分类')
+          : submittedCategory;
+
         const taskData = {
           id: taskId,
-          category: normalizeCategory(formData.get('category')),
+          category: finalCategory,
           task: String(formData.get('task') || '').trim(),
           detail: String(formData.get('detail') || '').trim(),
           progress: String(formData.get('progress') || '').trim(),
@@ -1868,6 +2226,14 @@
 
       const handleDeleteTask = async () => {
         if (!editingTask?.id) return;
+        const originalTask = tasks.find(t => t.id === editingTask.id);
+        if (!canDeleteTask(originalTask)) {
+          alert('当前访问权限不能删除这个板块的事项。');
+          return;
+        }
+        const confirmed = window.confirm('确认删除这个事项吗？删除后其他人也会同步看不到。');
+        if (!confirmed) return;
+
         const prevTasks = tasks;
         setSaving(true);
         setTasks(tasks.filter(t => t.id !== editingTask.id));
@@ -1896,6 +2262,15 @@
         if (!taskId) return;
         const targetTask = tasks.find(t => t.id === taskId);
         if (!targetTask) return;
+        if (!canEditTask(targetTask)) {
+          alert('当前访问权限不能移动这个板块的事项。');
+          return;
+        }
+        const finalNewCategory = newCategory ? normalizeCategory(newCategory) : null;
+        if (isRestrictedView && finalNewCategory && !allowedCategories.includes(finalNewCategory)) {
+          alert('当前访问权限不能移动到其他板块。');
+          return;
+        }
         
         // 拖入“需过目”列：仅仅打上 isUrgent 标记，不破坏其原有的底层 status
         let newStatus = targetTask.status;
@@ -1912,7 +2287,7 @@
           status: newStatus,
           isUrgent: newIsUrgent,
           updatedAt: Date.now(),
-          ...(newCategory ? { category: newCategory } : {})
+          ...(finalNewCategory ? { category: finalNewCategory } : {})
         };
         const prevTasks = tasks;
         const nextTasks = tasks.map(t => t.id === taskId ? { ...t, ...updatedFields } : t);
@@ -1983,14 +2358,49 @@
                   <p className="text-xs text-slate-400 mt-1">{dropDisabled ? '根据截止日期自动出现。' : '可把卡片拖到这里。'}</p>
                 </div>
               ) : groupCategories.map(cat => (
-                <CategoryAccordionGroup key={`${status}-${cat}`} category={cat} tasks={columnTasks.filter(t => (t.category || '未分类') === cat)} onEdit={setEditingTask} previewCount={status === 'Overdue' ? 1 : 2} />
+                <CategoryAccordionGroup key={`${status}-${cat}`} category={cat} tasks={columnTasks.filter(t => normalizeCategory(t.category) === cat)} onEdit={setEditingTask} previewCount={status === 'Overdue' ? 1 : 2} />
               ))}
             </div>
           </section>
         );
       };
 
-      if (loading) {
+      if (!accessCode) {
+        return (
+          <div className="access-gate-page">
+            <div className="access-gate-card">
+              <div className="access-gate-header">
+                <h2 className="access-gate-title">请输入访问码</h2>
+                <p className="access-gate-desc">请输入访问码后进入对应工作区。</p>
+              </div>
+              <form onSubmit={handleAccessSubmit} className="access-gate-form space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2">访问码</label>
+                  <input
+                    autoFocus
+                    type="password"
+                    value={accessInput}
+                    onChange={(e) => {
+                      setAccessInput(e.target.value);
+                      if (accessInputError) setAccessInputError('');
+                    }}
+                    placeholder="请输入访问码"
+                    className="access-gate-input"
+                  />
+                  {accessInputError && <p className="mt-2 text-xs font-medium text-rose-500">{accessInputError}</p>}
+                </div>
+                <div className="access-gate-actions">
+                  <button type="submit" className="access-gate-primary">
+                    进入工作区
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      if (loading && !showAccessModal) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 text-center">
             <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
@@ -2001,6 +2411,7 @@
       }
 
       return (
+        <>
         <div className="app-shell flex flex-col w-full overflow-hidden bg-transparent">
           <header className="glass-header mobile-compact-header border-b border-white/60 shrink-0 z-40 overflow-hidden">
             <div className="mobile-header-inner w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
@@ -2013,6 +2424,9 @@
                   {connectionNotice && <div className="sync-banner mt-2 rounded-xl px-3 py-2 text-[11px] leading-5 max-w-3xl">{connectionNotice}</div>}
                 </div>
                 <div className="mobile-top-actions flex flex-wrap gap-3 items-center">
+                  <button onClick={switchAccessCode} className="px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[12px] font-bold text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-sm" title="点击切换访问码">
+                    {accessCode ? `当前：${accessProfile.label}` : '输入访问码'}
+                  </button>
                   <div className="mobile-view-tabs flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner">
                     {viewOptions.map(v => (
                       <button key={v.id} onClick={() => setFilters(f => ({ ...f, view: v.id }))} className={`px-3.5 py-1.5 text-[12px] font-medium rounded-xl transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
@@ -2020,7 +2434,7 @@
                       </button>
                     ))}
                   </div>
-                  <button onClick={openNewTask} className="mobile-add-button px-3.5 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold shadow-sm">+ 新增事项</button>
+                  {accessProfile.canEdit && <button onClick={openNewTask} className="mobile-add-button px-3.5 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold shadow-sm">+ 新增事项</button>}
                 </div>
               </div>
 
@@ -2104,7 +2518,7 @@
                   {categories.filter(c => c !== 'All').length === 0 ? (
                     <div className="panel-glass rounded-2xl p-16 text-center text-slate-400">暂无板块数据</div>
                   ) : categories.filter(c => c !== 'All').map(cat => {
-                    const catTasks = filteredTasks.filter(t => t.category === cat && getBoardColumnKey(t) !== 'Done');
+                    const catTasks = filteredTasks.filter(t => normalizeCategory(t.category) === cat && getBoardColumnKey(t) !== 'Done');
                     if (catTasks.length === 0) return null;
                     return <CollapsibleSwimlane key={cat} catName={cat} columns={SWIMLANE_STATUSES} catTasks={catTasks} draggedOverCol={draggedOverCol} onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={handleDrop} onEdit={setEditingTask} />;
                   })}
@@ -2147,7 +2561,24 @@
                 <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="md:col-span-2"><label className="block text-[14px] font-semibold text-slate-600 mb-2">事项标题</label><input name="task" defaultValue={editingTask.task || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} required /></div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label><input name="category" defaultValue={editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                    <div>
+                      <label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label>
+                      {isRestrictedView ? (
+                        allowedCategories.length > 1 ? (
+                          <select name="category" defaultValue={editingTask.category || getDefaultCategoryForAccess()} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
+                            {allowedCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        ) : (
+                          <>
+                            <input value={allowedCategories[0] || editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[14px] text-slate-500" disabled readOnly />
+                            <input type="hidden" name="category" defaultValue={allowedCategories[0] || editingTask.category || ''} />
+                          </>
+                        )
+                      ) : (
+                        <input name="category" defaultValue={editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} />
+                      )}
+                      {isRestrictedView && <p className="mt-1.5 text-[11px] text-slate-400">当前访问码只允许操作：{allowedCategories.join('、')}</p>}
+                    </div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
@@ -2162,7 +2593,7 @@
                   <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
                 </form>
                 <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
-                  {editingTask.id ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
+                  {editingTask.id && canDeleteTask(tasks.find(t => t.id === editingTask.id)) ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
                   <div className="flex space-x-3">
                     <button type="button" onClick={() => setEditingTask(null)} disabled={saving} className="px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
                     <button type="submit" form="task-form" disabled={saving} className="px-6 py-2.5 text-[14px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all shadow-sm">{saving ? '保存中...' : '确认保存'}</button>
@@ -2172,6 +2603,45 @@
             </div>
           )}
         </div>
+
+        {showAccessModal && (
+          <div className="access-gate-overlay">
+            <div className="access-gate-card">
+              <div className="access-gate-header">
+                <h2 className="access-gate-title">请输入访问码</h2>
+                <p className="access-gate-desc">请输入访问码后进入对应工作区。</p>
+              </div>
+              <form onSubmit={handleAccessSubmit} className="access-gate-form space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2">访问码</label>
+                  <input
+                    autoFocus
+                    type="password"
+                    value={accessInput}
+                    onChange={(e) => {
+                      setAccessInput(e.target.value);
+                      if (accessInputError) setAccessInputError('');
+                    }}
+                    placeholder="请输入访问码"
+                    className="access-gate-input"
+                  />
+                  {accessInputError && <p className="mt-2 text-xs font-medium text-rose-500">{accessInputError}</p>}
+                </div>
+                <div className="access-gate-actions">
+                  {accessCode && (
+                    <button type="button" onClick={closeAccessModal} className="access-gate-secondary">
+                      取消
+                    </button>
+                  )}
+                  <button type="submit" className="access-gate-primary">
+                    进入工作区
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        </>
       );
     }
 
