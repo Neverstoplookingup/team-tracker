@@ -1307,9 +1307,38 @@
       if (task.isUrgent) return 'Need Attention';
       return task.status || 'To Do';
     };
+    const CATEGORY_OPTIONS = ['GR', 'HC&OBV', 'OPH', 'SZOBV'];
+
     const normalizeCategory = (value) => {
       if (!value || typeof value !== 'string' || !value.trim()) return '未分类';
       return value.trim();
+    };
+
+    const normalizeAssigneeName = (value) => {
+      const trimmed = String(value || '').trim().replace(/\s+/g, ' ');
+      if (!trimmed) return '';
+      // 中文姓名保持原样；英文姓名统一为首字母大写，避免 Harvey / harvey 被识别成两个人。
+      if (/[^a-zA-Z\s.'-]/.test(trimmed)) return trimmed;
+      return trimmed
+        .toLowerCase()
+        .split(' ')
+        .map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '')
+        .join(' ');
+    };
+
+    const normalizeAssigneeList = (value) => {
+      const seen = new Set();
+      return String(value || '')
+        .split(/[,&、]/)
+        .map(normalizeAssigneeName)
+        .filter(Boolean)
+        .filter(name => {
+          const key = name.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .join('、');
     };
     
     // 安全获取状态名称，防止因脏数据导致的崩溃
@@ -1388,7 +1417,7 @@
     };
 
     const AvatarGroup = ({ name }) => {
-      const names = (name && typeof name === 'string') ? name.split(/[,&、]/).map(n => n.trim()).filter(Boolean) : [];
+      const names = normalizeAssigneeList(name).split('、').filter(Boolean);
       if (names.length === 0) return <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">未分配</span>;
       return (
         <div className="flex items-center">
@@ -1726,7 +1755,7 @@
                             <div className="mobile-timeline-status">{config.title}</div>
                           </div>
                           <div className="mobile-timeline-meta">
-                            <span>负责人：{task.assignee || '未分配'}</span>
+                            <span>负责人：{normalizeAssigneeList(task.assignee) || '未分配'}</span>
                             <span>{formatShortDate(task._start)} - {formatShortDate(task._end)}</span>
                             {task.priority && <span>{task.priority.replace(' - ', ' ')}</span>}
                           </div>
@@ -1788,7 +1817,7 @@
                             <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
                               <div className="flex-1 min-w-0 pr-2">
                                 <p className="text-[13px] font-semibold text-slate-800 truncate">{task.task}</p>
-                                <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.assignee}</p>
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">{normalizeAssigneeList(task.assignee)}</p>
                               </div>
                             </div>
                             <div className="absolute top-0 bottom-0 right-0 pointer-events-none" style={{ left: leftColWidth }}>
@@ -1857,7 +1886,7 @@
                     <td className="px-4 py-3 text-slate-600 max-w-[360px]"><div className="line-clamp-2">{task.progress || '-'}</div></td>
                     <td className="px-4 py-3 text-slate-600">{getStatusTitle(getBoardColumnKey(task))}</td>
                     <td className="px-4 py-3 text-slate-600">{task.priority || 'P2 - 正常'}</td>
-                    <td className="px-4 py-3 text-slate-600">{task.assignee || '未分配'}</td>
+                    <td className="px-4 py-3 text-slate-600">{normalizeAssigneeList(task.assignee) || '未分配'}</td>
                     <td className="px-4 py-3 text-slate-600">{task.startDate || '-'}</td>
                     <td className="px-4 py-3 text-slate-600">{task.dueDate || '-'}</td>
                     <td className="px-4 py-3 text-slate-600 text-[12px]">{formatDateTime(task.updatedAt)}</td>
@@ -1887,6 +1916,18 @@
       const [showAccessModal, setShowAccessModal] = useState(() => !getStoredAccessCode());
       const [accessInput, setAccessInput] = useState('');
       const [accessInputError, setAccessInputError] = useState('');
+      const [assigneeDraft, setAssigneeDraft] = useState('');
+      const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+
+      useEffect(() => {
+        if (!editingTask) {
+          setAssigneeDraft('');
+          setAssigneeDropdownOpen(false);
+          return;
+        }
+        setAssigneeDraft(normalizeAssigneeList(editingTask.assignee));
+        setAssigneeDropdownOpen(false);
+      }, [editingTask]);
 
       const accessProfile = useMemo(() => {
         const profile = ACCESS_PROFILES[accessCode];
@@ -1922,9 +1963,20 @@
       const canDeleteTask = (task) => accessProfile.canDelete && canAccessTask(task);
 
       const getDefaultCategoryForAccess = () => {
-        if (!isRestrictedView) return filters.category !== 'All' ? filters.category : '';
+        if (!isRestrictedView) {
+          const selectedCategory = filters.category !== 'All' ? normalizeCategory(filters.category) : '';
+          return CATEGORY_OPTIONS.includes(selectedCategory) ? selectedCategory : CATEGORY_OPTIONS[0];
+        }
         if (filters.category !== 'All' && allowedCategories.includes(filters.category)) return filters.category;
         return accessProfile.defaultCategory || allowedCategories[0] || '';
+      };
+
+      const getEditableCategoryDefault = (currentCategory = '') => {
+        const options = isRestrictedView ? allowedCategories : CATEGORY_OPTIONS;
+        const normalizedCategory = currentCategory ? normalizeCategory(currentCategory) : '';
+        if (normalizedCategory && options.includes(normalizedCategory)) return normalizedCategory;
+        const accessDefault = getDefaultCategoryForAccess();
+        return options.includes(accessDefault) ? accessDefault : (options[0] || accessDefault || CATEGORY_OPTIONS[0]);
       };
 
       const applyAccessCode = (rawCode) => {
@@ -2124,14 +2176,29 @@
         return ['All', ...baseCategories];
       }, [visibleTasks, isRestrictedView, allowedCategories]);
 
-      const assignees = useMemo(() => ['All', ...new Set(visibleTasks.flatMap(t => t.assignee ? t.assignee.split(/[,&、]/).map(a => a.trim()).filter(Boolean) : []))], [visibleTasks]);
+      const assignees = useMemo(() => ['All', ...new Set(visibleTasks.flatMap(t => normalizeAssigneeList(t.assignee).split('、').filter(Boolean)))], [visibleTasks]);
+      const availableAssignees = useMemo(() => assignees.filter(a => a !== 'All'), [assignees]);
+      const selectedAssigneeNames = useMemo(() => normalizeAssigneeList(assigneeDraft).split('、').filter(Boolean), [assigneeDraft]);
+      const selectedAssigneeSet = useMemo(() => new Set(selectedAssigneeNames.map(name => name.toLowerCase())), [selectedAssigneeNames]);
+      const toggleAssigneeDraft = (name) => {
+        const normalizedName = normalizeAssigneeName(name);
+        if (!normalizedName) return;
+        const currentNames = normalizeAssigneeList(assigneeDraft).split('、').filter(Boolean);
+        const exists = currentNames.some(item => item.toLowerCase() === normalizedName.toLowerCase());
+        const nextNames = exists
+          ? currentNames.filter(item => item.toLowerCase() !== normalizedName.toLowerCase())
+          : [...currentNames, normalizedName];
+        setAssigneeDraft(normalizeAssigneeList(nextNames.join('、')));
+        setAssigneeDropdownOpen(true);
+      };
       const statusOptions = ['All', 'Need Attention', 'In progress', 'To Do', 'Pending', 'Overdue', 'Done'];
 
       const scopedTasks = useMemo(() => {
         return [...visibleTasks].filter(t => {
-          const matchSearch = `${t.task || ''} ${t.detail || ''} ${t.progress || ''} ${t.assignee || ''}`.toLowerCase().includes(filters.search.toLowerCase());
+          const normalizedAssignees = normalizeAssigneeList(t.assignee);
+          const matchSearch = `${t.task || ''} ${t.detail || ''} ${t.progress || ''} ${normalizedAssignees || ''}`.toLowerCase().includes(filters.search.toLowerCase());
           const matchCat = filters.category === 'All' || normalizeCategory(t.category) === filters.category;
-          const matchAssignee = filters.assignee === 'All' || (t.assignee && t.assignee.includes(filters.assignee));
+          const matchAssignee = filters.assignee === 'All' || normalizedAssignees.split('、').includes(filters.assignee);
           return matchSearch && matchCat && matchAssignee;
         });
       }, [visibleTasks, filters.search, filters.category, filters.assignee]);
@@ -2203,7 +2270,7 @@
           status: String(formData.get('status') || 'To Do'),
           priority: String(formData.get('priority') || 'P2 - 正常'),
           isUrgent: formData.get('isUrgent') === 'on',
-          assignee: String(formData.get('assignee') || '').trim(),
+          assignee: normalizeAssigneeList(formData.get('assignee')),
           startDate: String(formData.get('startDate') || '').trim(),
           dueDate: String(formData.get('dueDate') || '').trim(),
           attachmentUrl: String(formData.get('attachmentUrl') || '').trim(),
@@ -2573,21 +2640,78 @@
                       <label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label>
                       {isRestrictedView ? (
                         allowedCategories.length > 1 ? (
-                          <select name="category" defaultValue={editingTask.category || getDefaultCategoryForAccess()} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
-                            {allowedCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
+                          <div className="relative">
+                            <select name="category" defaultValue={getEditableCategoryDefault(editingTask.category)} className="w-full appearance-none px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
+                              {allowedCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                          </div>
                         ) : (
                           <>
-                            <input value={allowedCategories[0] || editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[14px] text-slate-500" disabled readOnly />
-                            <input type="hidden" name="category" defaultValue={allowedCategories[0] || editingTask.category || ''} />
+                            <input value={getEditableCategoryDefault(editingTask.category)} className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[14px] text-slate-500" disabled readOnly />
+                            <input type="hidden" name="category" defaultValue={getEditableCategoryDefault(editingTask.category)} />
                           </>
                         )
                       ) : (
-                        <input name="category" defaultValue={editingTask.category || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} />
+                        <div className="relative">
+                          <select name="category" defaultValue={getEditableCategoryDefault(editingTask.category)} className="w-full appearance-none px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
+                            {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </div>
+                        </div>
                       )}
                       {isRestrictedView && <p className="mt-1.5 text-[11px] text-slate-400">当前访问码只允许操作：{allowedCategories.join('、')}</p>}
                     </div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label><input name="assignee" defaultValue={editingTask.assignee || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
+                    <div>
+                      <label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label>
+                      <div className="relative">
+                        <input
+                          name="assignee"
+                          value={assigneeDraft}
+                          onChange={(e) => setAssigneeDraft(e.target.value)}
+                          onFocus={() => setAssigneeDropdownOpen(false)}
+                          placeholder="输入或选择负责人，多人可用顿号/逗号分隔"
+                          className="w-full px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+                          disabled={saving}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setAssigneeDropdownOpen(open => !open)}
+                          className="absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                          disabled={saving}
+                          aria-label="选择负责人"
+                        >
+                          <svg className={`w-3.5 h-3.5 transition-transform ${assigneeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+                        {assigneeDropdownOpen && (
+                          <div className="absolute z-30 mt-2 w-full max-h-56 overflow-y-auto custom-scrollbar rounded-xl border border-slate-200 bg-white shadow-xl p-2">
+                            {availableAssignees.length ? (
+                              availableAssignees.map(name => {
+                                const checked = selectedAssigneeSet.has(name.toLowerCase());
+                                return (
+                                  <button
+                                    type="button"
+                                    key={name}
+                                    onClick={() => toggleAssigneeDraft(name)}
+                                    className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${checked ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`}
+                                  >
+                                    <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${checked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>✓</span>
+                                    <span className="truncate">{name}</span>
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <div className="px-3 py-2 text-[12px] text-slate-400">暂无已有负责人，可直接输入新成员姓名。</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-slate-400">可连续勾选多个负责人；新成员直接输入姓名，保存后会自动加入负责人筛选。</p>
+                    </div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                     <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
                   </div>
