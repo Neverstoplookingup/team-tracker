@@ -4,11 +4,42 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>团队协作工作台</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // 启动保护：只在核心脚本失败或渲染前报错时显示，不影响正常布局和数据。
+    window.__showBootError = function(title, detail) {
+      var root = document.getElementById('root');
+      if (!root || root.childElementCount) return;
+      root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f8fbff;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">' +
+        '<div style="width:100%;max-width:520px;border-radius:24px;background:#fff;border:1px solid #e2e8f0;box-shadow:0 20px 60px rgba(15,23,42,.14);overflow:hidden;">' +
+        '<div style="padding:22px 24px;border-bottom:1px solid #e2e8f0;background:linear-gradient(135deg,#eef2ff,#fff,#f0f9ff);">' +
+        '<div style="font-size:20px;font-weight:800;letter-spacing:-.02em;">' + title + '</div>' +
+        '<div style="margin-top:8px;font-size:14px;line-height:1.7;color:#64748b;">' + (detail || '') + '</div>' +
+        '</div><div style="padding:18px 24px;font-size:13px;line-height:1.7;color:#475569;">建议先刷新页面；如果仍打不开，请检查浏览器控制台 Console 的红色报错，通常是 CDN、Firebase 或网络拦截导致。</div>' +
+        '</div></div>';
+    };
+
+    window.addEventListener('error', function(event) {
+      var root = document.getElementById('root');
+      if (root && !root.childElementCount && window.__showBootError) {
+        window.__showBootError('页面启动时发生错误', event && event.message ? event.message : '未知脚本错误');
+      }
+    }, true);
+
+    window.addEventListener('unhandledrejection', function(event) {
+      var root = document.getElementById('root');
+      var reason = event && event.reason;
+      if (root && !root.childElementCount && window.__showBootError) {
+        window.__showBootError('页面启动时发生异步错误', reason && reason.message ? reason.message : String(reason || '未知异步错误'));
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+  <script>window.React || document.write('<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin><\/script>');</script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script>window.ReactDOM || document.write('<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin><\/script>');</script>
+  <script src="https://cdn.tailwindcss.com" onerror="console.warn('Tailwind CDN 加载失败：页面可打开，但样式可能不完整。')"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>window.XLSX || document.write('<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>');</script>
   <style>
     * { box-sizing: border-box; }
     /* 彻底修复移动端滚动卡死问题：锁定视口，利用内部 Flex 容器实现原生丝滑滑动 */
@@ -1010,9 +1041,16 @@
     measurementId: "G-J9014LF5NG"
   };
 
-  const firebaseConfig = typeof __firebase_config !== 'undefined'
-    ? JSON.parse(__firebase_config)
-    : userConfig;
+  let firebaseConfig = userConfig;
+  try {
+    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+      firebaseConfig = JSON.parse(__firebase_config);
+    }
+  } catch (e) {
+    window.__fbInitError = e;
+    console.warn('Firebase config parse failed, fallback to userConfig:', e);
+    firebaseConfig = userConfig;
+  }
 
   const FB_SDK_VERSION = '12.11.0';
   const FIREBASE_INIT_TIMEOUT_MS = 9000;
@@ -1150,840 +1188,724 @@
   })();
 </script>
 
-  <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
-
-    const Icons = {
-      Eye: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
-      File: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-      Play: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-      Pause: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-      Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-      Alert: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 17c-.77 1.333.192 3 1.732 3z" /></svg>,
-      Search: () => <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
-      Link: () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
-      Edit: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
-      Download: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M7 10l5 5m0 0l5-5m-5 5V4" /></svg>,
-      EmptyBox: () => <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
-    };
-
-    const COLUMN_CONFIG = {
-      'Need Attention': { title: '需过目', borderColor: 'border-rose-400', headerBg: 'bg-rose-50', text: 'text-rose-600', icon: <Icons.Eye />, barColor: 'bg-rose-500' },
-      'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: <Icons.File />, barColor: 'bg-slate-400' },
-      'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: <Icons.Play />, barColor: 'bg-indigo-500' },
-      'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: <Icons.Pause />, barColor: 'bg-amber-400' },
-      'Overdue': { title: '已逾期', borderColor: 'border-red-400', headerBg: 'bg-red-50', text: 'text-red-600', icon: <Icons.Alert />, barColor: 'bg-red-500' },
-      'Done': { title: '已完成', borderColor: 'border-emerald-400', headerBg: 'bg-emerald-50', text: 'text-emerald-600', icon: <Icons.Check />, barColor: 'bg-emerald-500' }
-    };
-
-    const PRIORITY_WEIGHTS = { 'P0 - 紧急': 3, 'P1 - 优先': 2, 'P2 - 正常': 1, 'P3 - 暂缓': 0 };
-    const EDITABLE_STATUS_OPTIONS = ['To Do', 'In progress', 'Pending', 'Done'];
-    const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
-    const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
-
-    // 前端板块级协作权限：不改 Firebase，只控制页面可见/可编辑/可删除范围。
-    // 重要：这不是数据库安全权限；懂技术的人仍可能绕过前端限制。
-    const ACCESS_PROFILES = {
-      ADMIN: {
+  <script>
+const { useState, useEffect, useMemo } = React;
+const Icons = {
+    Eye: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15 12a3 3 0 11-6 0 3 3 0 016 0z" }),
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" })),
+    File: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" })),
+    Play: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" }),
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M21 12a9 9 0 11-18 0 9 9 0 0118 0z" })),
+    Pause: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" })),
+    Check: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" })),
+    Alert: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M12 9v3m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 17c-.77 1.333.192 3 1.732 3z" })),
+    Search: () => React.createElement("svg", { className: "w-4 h-4 text-slate-400", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" })),
+    Link: () => React.createElement("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" })),
+    Edit: () => React.createElement("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" })),
+    Download: () => React.createElement("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M7 10l5 5m0 0l5-5m-5 5V4" })),
+    EmptyBox: () => React.createElement("svg", { className: "w-12 h-12 text-slate-300 mb-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1, d: "M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" }))
+};
+const COLUMN_CONFIG = {
+    'Need Attention': { title: '需过目', borderColor: 'border-rose-400', headerBg: 'bg-rose-50', text: 'text-rose-600', icon: React.createElement(Icons.Eye, null), barColor: 'bg-rose-500' },
+    'To Do': { title: '待处理', borderColor: 'border-slate-300', headerBg: 'bg-slate-100', text: 'text-slate-600', icon: React.createElement(Icons.File, null), barColor: 'bg-slate-400' },
+    'In progress': { title: '进行中', borderColor: 'border-indigo-400', headerBg: 'bg-indigo-50', text: 'text-indigo-600', icon: React.createElement(Icons.Play, null), barColor: 'bg-indigo-500' },
+    'Pending': { title: '等待/暂停', borderColor: 'border-amber-400', headerBg: 'bg-amber-50', text: 'text-amber-600', icon: React.createElement(Icons.Pause, null), barColor: 'bg-amber-400' },
+    'Overdue': { title: '已逾期', borderColor: 'border-red-400', headerBg: 'bg-red-50', text: 'text-red-600', icon: React.createElement(Icons.Alert, null), barColor: 'bg-red-500' },
+    'Done': { title: '已完成', borderColor: 'border-emerald-400', headerBg: 'bg-emerald-50', text: 'text-emerald-600', icon: React.createElement(Icons.Check, null), barColor: 'bg-emerald-500' }
+};
+const PRIORITY_WEIGHTS = { 'P0 - 紧急': 3, 'P1 - 优先': 2, 'P2 - 正常': 1, 'P3 - 暂缓': 0 };
+const EDITABLE_STATUS_OPTIONS = ['To Do', 'In progress', 'Pending', 'Done'];
+const KANBAN_COMPACT_STATUSES = ['Need Attention', 'To Do', 'Pending', 'Overdue'];
+const SWIMLANE_STATUSES = ['Need Attention', 'In progress', 'Pending', 'Overdue'];
+// 前端板块级协作权限：不改 Firebase，只控制页面可见/可编辑/可删除范围。
+// 重要：这不是数据库安全权限；懂技术的人仍可能绕过前端限制。
+const ACCESS_PROFILES = {
+    ADMIN: {
         label: '管理员',
         categories: null,
         canEdit: true,
         canDelete: true,
         canExport: true,
         defaultCategory: ''
-      },
-      GAREA: {
+    },
+    GAREA: {
         label: 'GR 工作区',
         categories: ['GR'],
         canEdit: true,
         canDelete: true,
         canExport: false,
         defaultCategory: 'GR'
-      },
-      HCOBV: {
+    },
+    HCOBV: {
         label: 'HC&OBV 工作区',
         categories: ['HC&OBV'],
         canEdit: true,
         canDelete: true,
         canExport: false,
         defaultCategory: 'HC&OBV'
-      },
-      OPH: {
+    },
+    OPH: {
         label: 'OPH 工作区',
         categories: ['OPH'],
         canEdit: true,
         canDelete: true,
         canExport: false,
         defaultCategory: 'OPH'
-      },
-      SZOBV: {
+    },
+    SZOBV: {
         label: 'SZOBV 工作区',
         categories: ['SZOBV'],
         canEdit: true,
         canDelete: true,
         canExport: false,
         defaultCategory: 'SZOBV'
-      }
-    };
-
-    const normalizeAccessCode = (value) => String(value || '').trim().toUpperCase();
-
-    const getStoredAccessCode = () => {
-      // 只允许 URL 中明确带 access 参数时自动进入；否则必须先输入访问码。
-      // 不再从 localStorage 自动恢复，避免上次管理员登录后下次打开直接看到全部板块。
-      const params = new URLSearchParams(window.location.search);
-      const fromUrl = normalizeAccessCode(params.get('access'));
-      if (ACCESS_PROFILES[fromUrl]) return fromUrl;
-      return '';
-    };
-
-    const FIREBASE_CLIENT_TIMEOUT_MS = 10000;
-
-    const clientTimeout = (promise, ms, label) => {
-      let timer;
-      const timeoutPromise = new Promise((_, reject) => {
+    }
+};
+const normalizeAccessCode = (value) => String(value || '').trim().toUpperCase();
+const getStoredAccessCode = () => {
+    // 只允许 URL 中明确带 access 参数时自动进入；否则必须先输入访问码。
+    // 不再从 localStorage 自动恢复，避免上次管理员登录后下次打开直接看到全部板块。
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = normalizeAccessCode(params.get('access'));
+    if (ACCESS_PROFILES[fromUrl])
+        return fromUrl;
+    return '';
+};
+const FIREBASE_CLIENT_TIMEOUT_MS = 10000;
+const clientTimeout = (promise, ms, label) => {
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error(label || '操作超时')), ms);
-      });
-      return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
-    };
-
-    // 不再使用本地数据兜底，确保手机端和电脑端进入的是同一个 Firestore 云端看板。
-    // 云端连接慢时，先打开工作台界面并显示连接状态；云端快照返回后自动填充真实数据。
-    const DEFAULT_TASKS = [];
-
-    const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const getCreatedAt = (task) => task?.createdAt || task?.updatedAt || Date.now();
-    const parseDateOnly = (dateStr) => {
-      if (!dateStr) return null;
-      const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
-      return Number.isNaN(d.getTime()) ? null : d;
-    };
-    const formatDateTime = (timestamp) => {
-      if (!timestamp) return '-';
-      const d = new Date(Number(timestamp));
-      if (Number.isNaN(d.getTime())) return String(timestamp);
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const date = String(d.getDate()).padStart(2, '0');
-      const year = d.getFullYear();
-      const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      return `${month}/${date}/${year}, ${hours}:${minutes}`;
-    };
-    const formatDateRange = (startDate, dueDate) => `${startDate ? startDate.substring(5).replace('-', '.') : '未定'} 至 ${dueDate ? dueDate.substring(5).replace('-', '.') : '至今'}`;
-    const getInitials = (name) => {
-      if (!name || typeof name !== 'string' || !name.trim()) return '?';
-      const first = name.split(/[,&、]/)[0].trim();
-      return /^[a-zA-Z]/.test(first) ? first.substring(0, 2).toUpperCase() : first.substring(0, 1);
-    };
-    const stringToColor = (str = '') => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-      return `hsl(${Math.abs(hash) % 360}, 65%, 78%)`;
-    };
-    // 用固定业务时区判断逾期，避免电脑/手机因系统时区不同导致看板数据位置不一致。
-    const BUSINESS_TIME_ZONE = 'America/Los_Angeles';
-    const getTodayKey = () => new Intl.DateTimeFormat('en-CA', {
-      timeZone: BUSINESS_TIME_ZONE,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(new Date());
-
-    const isOverdue = (task) => {
-      if (!task?.dueDate || task?.status === 'Done') return false;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(task.dueDate)) {
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+};
+// 不再使用本地数据兜底，确保手机端和电脑端进入的是同一个 Firestore 云端看板。
+// 云端连接慢时，先打开工作台界面并显示连接状态；云端快照返回后自动填充真实数据。
+const DEFAULT_TASKS = [];
+const generateId = () => `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+const getCreatedAt = (task) => (task === null || task === void 0 ? void 0 : task.createdAt) || (task === null || task === void 0 ? void 0 : task.updatedAt) || Date.now();
+const parseDateOnly = (dateStr) => {
+    if (!dateStr)
+        return null;
+    const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+    return Number.isNaN(d.getTime()) ? null : d;
+};
+const formatDateTime = (timestamp) => {
+    if (!timestamp)
+        return '-';
+    const d = new Date(Number(timestamp));
+    if (Number.isNaN(d.getTime()))
+        return String(timestamp);
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const date = String(d.getDate()).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${month}/${date}/${year}, ${hours}:${minutes}`;
+};
+const formatDateRange = (startDate, dueDate) => `${startDate ? startDate.substring(5).replace('-', '.') : '未定'} 至 ${dueDate ? dueDate.substring(5).replace('-', '.') : '至今'}`;
+const getInitials = (name) => {
+    if (!name || typeof name !== 'string' || !name.trim())
+        return '?';
+    const first = name.split(/[,&、]/)[0].trim();
+    return /^[a-zA-Z]/.test(first) ? first.substring(0, 2).toUpperCase() : first.substring(0, 1);
+};
+const stringToColor = (str = '') => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++)
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsl(${Math.abs(hash) % 360}, 65%, 78%)`;
+};
+// 用固定业务时区判断逾期，避免电脑/手机因系统时区不同导致看板数据位置不一致。
+const BUSINESS_TIME_ZONE = 'America/Los_Angeles';
+const getTodayKey = () => new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+}).format(new Date());
+const isOverdue = (task) => {
+    if (!(task === null || task === void 0 ? void 0 : task.dueDate) || (task === null || task === void 0 ? void 0 : task.status) === 'Done')
+        return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(task.dueDate)) {
         const due = parseDateOnly(task.dueDate);
-        if (!due) return false;
+        if (!due)
+            return false;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return due < today;
-      }
-      return task.dueDate < getTodayKey();
-    };
-    const getBoardColumnKey = (task) => {
-      if (!task) return 'To Do';
-      if (task.status === 'Done') return 'Done';
-      if (isOverdue(task)) return 'Overdue';
-      if (task.isUrgent) return 'Need Attention';
-      return task.status || 'To Do';
-    };
-    const CATEGORY_OPTIONS = ['GR', 'HC&OBV', 'OPH', 'SZOBV'];
-
-    const normalizeCategory = (value) => {
-      if (!value || typeof value !== 'string' || !value.trim()) return '未分类';
-      return value.trim();
-    };
-
-    const normalizeAssigneeName = (value) => {
-      const trimmed = String(value || '').trim().replace(/\s+/g, ' ');
-      if (!trimmed) return '';
-      // 中文姓名保持原样；英文姓名统一为首字母大写，避免 Harvey / harvey 被识别成两个人。
-      if (/[^a-zA-Z\s.'-]/.test(trimmed)) return trimmed;
-      return trimmed
+    }
+    return task.dueDate < getTodayKey();
+};
+const getBoardColumnKey = (task) => {
+    if (!task)
+        return 'To Do';
+    if (task.status === 'Done')
+        return 'Done';
+    if (isOverdue(task))
+        return 'Overdue';
+    if (task.isUrgent)
+        return 'Need Attention';
+    return task.status || 'To Do';
+};
+const CATEGORY_OPTIONS = ['GR', 'HC&OBV', 'OPH', 'SZOBV'];
+const normalizeCategory = (value) => {
+    if (!value || typeof value !== 'string' || !value.trim())
+        return '未分类';
+    return value.trim();
+};
+const normalizeAssigneeName = (value) => {
+    const trimmed = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed)
+        return '';
+    // 中文姓名保持原样；英文姓名统一为首字母大写，避免 Harvey / harvey 被识别成两个人。
+    if (/[^a-zA-Z\s.'-]/.test(trimmed))
+        return trimmed;
+    return trimmed
         .toLowerCase()
         .split(' ')
         .map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '')
         .join(' ');
-    };
-
-    const normalizeAssigneeList = (value) => {
-      const seen = new Set();
-      return String(value || '')
+};
+const normalizeAssigneeList = (value) => {
+    const seen = new Set();
+    return String(value || '')
         .split(/[,&、]/)
         .map(normalizeAssigneeName)
         .filter(Boolean)
         .filter(name => {
-          const key = name.toLowerCase();
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
+        const key = name.toLowerCase();
+        if (seen.has(key))
+            return false;
+        seen.add(key);
+        return true;
+    })
         .join('、');
-    };
-    
-    // 安全获取状态名称，防止因脏数据导致的崩溃
-    const getStatusTitle = (statusKey) => COLUMN_CONFIG[statusKey]?.title || statusKey || '未知状态';
-    
-    const sortTasks = (tasksList) => [...tasksList].sort((a, b) => {
-      const wa = PRIORITY_WEIGHTS[a.priority] ?? 1;
-      const wb = PRIORITY_WEIGHTS[b.priority] ?? 1;
-      if (wa !== wb) return wb - wa;
-      return getCreatedAt(b) - getCreatedAt(a);
-    });
-
-    const buildExportRows = (tasksList) => sortTasks(tasksList).map(task => ({
-      '板块分类': task.category || '未分类',
-      '事项标题': task.task || '未命名事项',
-      '最新进展': task.progress || '',
-      '内部说明备注': task.detail || '',
-      '看板状态': getStatusTitle(getBoardColumnKey(task)),
-      '当前业务状态': task.status || 'To Do',
-      '优先级': task.priority || 'P2 - 正常',
-      '需过目': task.isUrgent ? '是' : '否',
-      '参与人': task.assignee || '未分配',
-      '开始日期': task.startDate || '',
-      '截止日期': task.dueDate || '',
-      '相关链接': task.attachmentUrl || '',
-      '创建时间': formatDateTime(task.createdAt),
-      '最后修订时间': formatDateTime(task.updatedAt)
-    }));
-
-    const downloadBlob = (blob, filename) => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    };
-
-    const exportTasksToExcel = (tasksList) => {
-      const rows = buildExportRows(tasksList);
-      if (!rows.length) {
+};
+// 安全获取状态名称，防止因脏数据导致的崩溃
+const getStatusTitle = (statusKey) => { var _a; return ((_a = COLUMN_CONFIG[statusKey]) === null || _a === void 0 ? void 0 : _a.title) || statusKey || '未知状态'; };
+const sortTasks = (tasksList) => [...tasksList].sort((a, b) => {
+    var _a, _b;
+    const wa = (_a = PRIORITY_WEIGHTS[a.priority]) !== null && _a !== void 0 ? _a : 1;
+    const wb = (_b = PRIORITY_WEIGHTS[b.priority]) !== null && _b !== void 0 ? _b : 1;
+    if (wa !== wb)
+        return wb - wa;
+    return getCreatedAt(b) - getCreatedAt(a);
+});
+const buildExportRows = (tasksList) => sortTasks(tasksList).map(task => ({
+    '板块分类': task.category || '未分类',
+    '事项标题': task.task || '未命名事项',
+    '最新进展': task.progress || '',
+    '内部说明备注': task.detail || '',
+    '看板状态': getStatusTitle(getBoardColumnKey(task)),
+    '当前业务状态': task.status || 'To Do',
+    '优先级': task.priority || 'P2 - 正常',
+    '需过目': task.isUrgent ? '是' : '否',
+    '参与人': task.assignee || '未分配',
+    '开始日期': task.startDate || '',
+    '截止日期': task.dueDate || '',
+    '相关链接': task.attachmentUrl || '',
+    '创建时间': formatDateTime(task.createdAt),
+    '最后修订时间': formatDateTime(task.updatedAt)
+}));
+const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+const exportTasksToExcel = (tasksList) => {
+    var _a;
+    const rows = buildExportRows(tasksList);
+    if (!rows.length) {
         alert('当前列表没有可导出的内容。');
         return;
-      }
-
-      const now = new Date();
-      const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-      const filenameBase = `团队协作工作台_列表清单_${stamp}`;
-
-      if (window.XLSX) {
+    }
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const filenameBase = `团队协作工作台_列表清单_${stamp}`;
+    if (window.XLSX) {
         const worksheet = window.XLSX.utils.json_to_sheet(rows);
         const workbook = window.XLSX.utils.book_new();
         window.XLSX.utils.book_append_sheet(workbook, worksheet, '工作进度');
         const range = window.XLSX.utils.decode_range(worksheet['!ref']);
         const columnWidths = [];
         for (let c = range.s.c; c <= range.e.c; c++) {
-          let maxLen = 10;
-          for (let r = range.s.r; r <= range.e.r; r++) {
-            const cell = worksheet[window.XLSX.utils.encode_cell({ r, c })];
-            const value = cell ? String(cell.v ?? '') : '';
-            maxLen = Math.max(maxLen, Math.min(value.length + 2, 40));
-          }
-          columnWidths.push({ wch: maxLen });
+            let maxLen = 10;
+            for (let r = range.s.r; r <= range.e.r; r++) {
+                const cell = worksheet[window.XLSX.utils.encode_cell({ r, c })];
+                const value = cell ? String((_a = cell.v) !== null && _a !== void 0 ? _a : '') : '';
+                maxLen = Math.max(maxLen, Math.min(value.length + 2, 40));
+            }
+            columnWidths.push({ wch: maxLen });
         }
         worksheet['!cols'] = columnWidths;
         window.XLSX.writeFile(workbook, `${filenameBase}.xlsx`);
         return;
-      }
-
-      const headers = Object.keys(rows[0]);
-      const csv = [headers.join(','), ...rows.map(row => headers.map(key => `"${String(row[key] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
-      downloadBlob(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' }), `${filenameBase}.csv`);
-      alert('Excel 组件未加载成功，已改为导出 CSV，Excel 也可以直接打开。');
-    };
-
-    const AvatarGroup = ({ name }) => {
-      const names = normalizeAssigneeList(name).split('、').filter(Boolean);
-      if (names.length === 0) return <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">未分配</span>;
-      return (
-        <div className="flex items-center">
-          <div className="flex -space-x-1.5">
-            {names.slice(0, 3).map((n, i) => (
-              <div key={i} className="w-5 h-5 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-slate-700 shadow-sm" style={{ backgroundColor: stringToColor(n) }} title={n}>
-                {getInitials(n)}
-              </div>
-            ))}
-            {names.length > 3 && <div className="w-5 h-5 rounded-full ring-2 ring-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shadow-sm">+{names.length - 3}</div>}
-          </div>
-          {names.length === 1 && <span className="text-[10px] text-slate-500 ml-1.5 truncate max-w-[80px] font-medium">{names[0]}</span>}
-        </div>
-      );
-    };
-
-    const TaskCard = ({ task, onEdit }) => {
-      const boardKey = getBoardColumnKey(task);
-      const config = COLUMN_CONFIG[boardKey] || COLUMN_CONFIG['To Do'];
-      const overdue = boardKey === 'Overdue';
-      const handleDragStart = (e) => {
+    }
+    const headers = Object.keys(rows[0]);
+    const csv = [headers.join(','), ...rows.map(row => headers.map(key => { var _a; return `"${String((_a = row[key]) !== null && _a !== void 0 ? _a : '').replace(/"/g, '""')}"`; }).join(','))].join('\n');
+    downloadBlob(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' }), `${filenameBase}.csv`);
+    alert('Excel 组件未加载成功，已改为导出 CSV，Excel 也可以直接打开。');
+};
+const AvatarGroup = ({ name }) => {
+    const names = normalizeAssigneeList(name).split('、').filter(Boolean);
+    if (names.length === 0)
+        return React.createElement("span", { className: "text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm" }, "\u672A\u5206\u914D");
+    return (React.createElement("div", { className: "flex items-center" },
+        React.createElement("div", { className: "flex -space-x-1.5" },
+            names.slice(0, 3).map((n, i) => (React.createElement("div", { key: i, className: "w-5 h-5 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-slate-700 shadow-sm", style: { backgroundColor: stringToColor(n) }, title: n }, getInitials(n)))),
+            names.length > 3 && React.createElement("div", { className: "w-5 h-5 rounded-full ring-2 ring-white bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-600 shadow-sm" },
+                "+",
+                names.length - 3)),
+        names.length === 1 && React.createElement("span", { className: "text-[10px] text-slate-500 ml-1.5 truncate max-w-[80px] font-medium" }, names[0])));
+};
+const TaskCard = ({ task, onEdit }) => {
+    const boardKey = getBoardColumnKey(task);
+    const config = COLUMN_CONFIG[boardKey] || COLUMN_CONFIG['To Do'];
+    const overdue = boardKey === 'Overdue';
+    const handleDragStart = (e) => {
         e.dataTransfer.setData('taskId', task.id);
         setTimeout(() => e.currentTarget.classList.add('dragging'), 0);
-      };
-      const handleDragEnd = (e) => e.currentTarget.classList.remove('dragging');
-      return (
-        <article
-          draggable="true"
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onClick={() => onEdit(task)}
-          className={`task-card rounded-2xl p-3 flex flex-col min-h-[96px] cursor-grab active:cursor-grabbing group ${task.isUrgent ? 'task-card-urgent' : ''} ${overdue ? 'task-card-overdue' : ''}`}
-        >
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex flex-wrap gap-1.5">
-              {task.isUrgent && <span className="px-1.5 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold rounded-md">需过目</span>}
-              {(task.priority === 'P0 - 紧急' || task.priority === 'P1 - 优先') && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm ${task.priority === 'P0 - 紧急' ? 'text-red-600 bg-red-50 border border-red-100' : 'text-orange-600 bg-orange-50 border border-orange-100'}`}>
-                  {task.priority === 'P0 - 紧急' ? 'P0 紧急' : 'P1 优先'}
-                </span>
-              )}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${overdue ? 'overdue-pill' : 'healthy-pill'}`}>
-                {config.title}
-              </span>
-            </div>
-            <span className="opacity-0 group-hover:opacity-100 smooth-transition text-indigo-500 bg-indigo-50 p-1 rounded"><Icons.Edit /></span>
-          </div>
-
-          <h4 className="font-semibold text-slate-800 text-[13px] leading-5 line-clamp-2 group-hover:text-indigo-600 transition-colors">
-            {task.task || '未命名事项'}
-          </h4>
-
-          {task.progress && <p className="text-[12px] text-slate-500 line-clamp-1 leading-5 mt-1.5">{task.progress}</p>}
-
-          <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100/80 gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <AvatarGroup name={task.assignee} />
-              {task.attachmentUrl && <span className="text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md shrink-0">链接</span>}
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
-              {(task.startDate || task.dueDate) && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${overdue ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}`}>
-                  {formatDateRange(task.startDate, task.dueDate)}
-                </span>
-              )}
-            </div>
-          </div>
-        </article>
-      );
     };
-
-    const CategoryAccordionGroup = ({ category, tasks, onEdit, defaultExpanded = false, previewCount = 2 }) => {
-      const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-      const sortedTasks = sortTasks(tasks);
-      const urgentCount = sortedTasks.filter(t => getBoardColumnKey(t) === 'Need Attention').length;
-      const overdueCount = sortedTasks.filter(t => getBoardColumnKey(t) === 'Overdue').length;
-      const inProgressCount = sortedTasks.filter(t => getBoardColumnKey(t) === 'In progress').length;
-      const visibleTasks = isExpanded ? sortedTasks : sortedTasks.slice(0, previewCount);
-      return (
-        <div className="category-mobile-compact mb-3 bg-white/60 rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
-          <button onClick={() => setIsExpanded(!isExpanded)} className="w-full flex items-center justify-between px-3 py-3 hover:bg-white transition-colors border-b border-slate-100/50 text-left">
-            <div className="min-w-0 pr-3">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>{category}</div>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold">{sortedTasks.length} 项</span>
-                {inProgressCount > 0 && <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold">推进中 {inProgressCount}</span>}
-                {urgentCount > 0 && <span className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded font-semibold">需过目 {urgentCount}</span>}
-                {overdueCount > 0 && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded font-semibold">逾期 {overdueCount}</span>}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {!isExpanded && sortedTasks.length > previewCount && <span className="text-[11px] text-slate-400">先显示 {previewCount} 项</span>}
-              <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">{isExpanded ? '收起' : '展开'}</span>
-            </div>
-          </button>
-          <div className="p-2.5 space-y-2 bg-slate-50/20">
-            {visibleTasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} />)}
-            {!isExpanded && sortedTasks.length > previewCount && (
-              <button onClick={() => setIsExpanded(true)} className="w-full rounded-xl border border-dashed border-slate-200 bg-white/70 hover:bg-white px-3 py-2 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors">
-                还有 {sortedTasks.length - previewCount} 项，点击展开查看
-              </button>
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    const CompletedArchivePanel = ({ tasks, onEdit }) => {
-      const [isOpen, setIsOpen] = useState(false);
-      const groupedCategories = [...new Set(tasks.map(t => t.category || '未分类'))].sort();
-      if (tasks.length === 0) return null;
-      return (
-        <section className="mt-5 panel-glass rounded-3xl overflow-hidden border border-emerald-100">
-          <button onClick={() => setIsOpen(!isOpen)} className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-white/60 transition-colors">
-            <div>
-              <div className="text-sm font-bold text-slate-800">已完成项目归档</div>
-              <div className="text-xs text-slate-500 mt-1">逾期项目不会自动归档，团队确认完成后再手动拖入或编辑为已完成。</div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{tasks.length} 项已完成</span>
-              <span className="text-[11px] font-semibold text-slate-600 bg-white px-2.5 py-1 rounded-full">{isOpen ? '收起' : '展开'}</span>
-            </div>
-          </button>
-          {isOpen && (
-            <div className="px-4 pb-4">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {groupedCategories.map(category => (
-                  <CategoryAccordionGroup
-                    key={`done-${category}`}
-                    category={category}
-                    tasks={tasks.filter(t => normalizeCategory(t.category) === category)}
-                    onEdit={onEdit}
-                    defaultExpanded={false}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      );
-    };
-
-    const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
-      const [isOpen, setIsOpen] = useState(true);
-      return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col mb-5 smooth-transition">
-          <button onClick={() => setIsOpen(!isOpen)} className="bg-slate-50 hover:bg-slate-100 transition-colors px-4 py-3.5 flex justify-between items-center w-full border-b border-slate-200">
-            <div className="flex items-center space-x-3">
-              <svg className={`w-4 h-4 text-slate-400 smooth-transition ${isOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-              <h2 className="font-bold text-slate-700 text-sm tracking-wide flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-indigo-400"></span>{catName}</h2>
-              <span className="text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">{catTasks.length} 项</span>
-            </div>
-          </button>
-          <div className={`swimlane-content bg-slate-50/50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}`}>
-            <div className="flex overflow-x-auto custom-scrollbar p-4 space-x-4 min-h-[220px]">
-              {columns.map(status => {
+    const handleDragEnd = (e) => e.currentTarget.classList.remove('dragging');
+    return (React.createElement("article", { draggable: "true", onDragStart: handleDragStart, onDragEnd: handleDragEnd, onClick: () => onEdit(task), className: `task-card rounded-2xl p-3 flex flex-col min-h-[96px] cursor-grab active:cursor-grabbing group ${task.isUrgent ? 'task-card-urgent' : ''} ${overdue ? 'task-card-overdue' : ''}` },
+        React.createElement("div", { className: "flex items-start justify-between gap-2 mb-2" },
+            React.createElement("div", { className: "flex flex-wrap gap-1.5" },
+                task.isUrgent && React.createElement("span", { className: "px-1.5 py-0.5 bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold rounded-md" }, "\u9700\u8FC7\u76EE"),
+                (task.priority === 'P0 - 紧急' || task.priority === 'P1 - 优先') && (React.createElement("span", { className: `text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-sm ${task.priority === 'P0 - 紧急' ? 'text-red-600 bg-red-50 border border-red-100' : 'text-orange-600 bg-orange-50 border border-orange-100'}` }, task.priority === 'P0 - 紧急' ? 'P0 紧急' : 'P1 优先')),
+                React.createElement("span", { className: `text-[10px] px-1.5 py-0.5 rounded-full ${overdue ? 'overdue-pill' : 'healthy-pill'}` }, config.title)),
+            React.createElement("span", { className: "opacity-0 group-hover:opacity-100 smooth-transition text-indigo-500 bg-indigo-50 p-1 rounded" },
+                React.createElement(Icons.Edit, null))),
+        React.createElement("h4", { className: "font-semibold text-slate-800 text-[13px] leading-5 line-clamp-2 group-hover:text-indigo-600 transition-colors" }, task.task || '未命名事项'),
+        task.progress && React.createElement("p", { className: "text-[12px] text-slate-500 line-clamp-1 leading-5 mt-1.5" }, task.progress),
+        React.createElement("div", { className: "flex items-center justify-between mt-auto pt-3 border-t border-slate-100/80 gap-2" },
+            React.createElement("div", { className: "flex items-center gap-2 min-w-0" },
+                React.createElement(AvatarGroup, { name: task.assignee }),
+                task.attachmentUrl && React.createElement("span", { className: "text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md shrink-0" }, "\u94FE\u63A5")),
+            React.createElement("div", { className: "flex items-center gap-1.5 flex-wrap justify-end shrink-0" }, (task.startDate || task.dueDate) && (React.createElement("span", { className: `text-[10px] px-1.5 py-0.5 rounded font-medium ${overdue ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-500'}` }, formatDateRange(task.startDate, task.dueDate)))))));
+};
+const CategoryAccordionGroup = ({ category, tasks, onEdit, defaultExpanded = false, previewCount = 2 }) => {
+    const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+    const sortedTasks = sortTasks(tasks);
+    const urgentCount = sortedTasks.filter(t => getBoardColumnKey(t) === 'Need Attention').length;
+    const overdueCount = sortedTasks.filter(t => getBoardColumnKey(t) === 'Overdue').length;
+    const inProgressCount = sortedTasks.filter(t => getBoardColumnKey(t) === 'In progress').length;
+    const visibleTasks = isExpanded ? sortedTasks : sortedTasks.slice(0, previewCount);
+    return (React.createElement("div", { className: "category-mobile-compact mb-3 bg-white/60 rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden" },
+        React.createElement("button", { onClick: () => setIsExpanded(!isExpanded), className: "w-full flex items-center justify-between px-3 py-3 hover:bg-white transition-colors border-b border-slate-100/50 text-left" },
+            React.createElement("div", { className: "min-w-0 pr-3" },
+                React.createElement("div", { className: "text-xs font-bold text-slate-700 flex items-center gap-1.5" },
+                    React.createElement("span", { className: "w-1.5 h-1.5 rounded-full bg-indigo-400" }),
+                    category),
+                React.createElement("div", { className: "flex flex-wrap gap-1.5 mt-2" },
+                    React.createElement("span", { className: "text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold" },
+                        sortedTasks.length,
+                        " \u9879"),
+                    inProgressCount > 0 && React.createElement("span", { className: "text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold" },
+                        "\u63A8\u8FDB\u4E2D ",
+                        inProgressCount),
+                    urgentCount > 0 && React.createElement("span", { className: "text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded font-semibold" },
+                        "\u9700\u8FC7\u76EE ",
+                        urgentCount),
+                    overdueCount > 0 && React.createElement("span", { className: "text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded font-semibold" },
+                        "\u903E\u671F ",
+                        overdueCount))),
+            React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                !isExpanded && sortedTasks.length > previewCount && React.createElement("span", { className: "text-[11px] text-slate-400" },
+                    "\u5148\u663E\u793A ",
+                    previewCount,
+                    " \u9879"),
+                React.createElement("span", { className: "text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full" }, isExpanded ? '收起' : '展开'))),
+        React.createElement("div", { className: "p-2.5 space-y-2 bg-slate-50/20" },
+            visibleTasks.map(task => React.createElement(TaskCard, { key: task.id, task: task, onEdit: onEdit })),
+            !isExpanded && sortedTasks.length > previewCount && (React.createElement("button", { onClick: () => setIsExpanded(true), className: "w-full rounded-xl border border-dashed border-slate-200 bg-white/70 hover:bg-white px-3 py-2 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors" },
+                "\u8FD8\u6709 ",
+                sortedTasks.length - previewCount,
+                " \u9879\uFF0C\u70B9\u51FB\u5C55\u5F00\u67E5\u770B")))));
+};
+const CompletedArchivePanel = ({ tasks, onEdit }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const groupedCategories = [...new Set(tasks.map(t => t.category || '未分类'))].sort();
+    if (tasks.length === 0)
+        return null;
+    return (React.createElement("section", { className: "mt-5 panel-glass rounded-3xl overflow-hidden border border-emerald-100" },
+        React.createElement("button", { onClick: () => setIsOpen(!isOpen), className: "w-full px-5 py-4 flex items-center justify-between text-left hover:bg-white/60 transition-colors" },
+            React.createElement("div", null,
+                React.createElement("div", { className: "text-sm font-bold text-slate-800" }, "\u5DF2\u5B8C\u6210\u9879\u76EE\u5F52\u6863"),
+                React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, "\u903E\u671F\u9879\u76EE\u4E0D\u4F1A\u81EA\u52A8\u5F52\u6863\uFF0C\u56E2\u961F\u786E\u8BA4\u5B8C\u6210\u540E\u518D\u624B\u52A8\u62D6\u5165\u6216\u7F16\u8F91\u4E3A\u5DF2\u5B8C\u6210\u3002")),
+            React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                React.createElement("span", { className: "text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full" },
+                    tasks.length,
+                    " \u9879\u5DF2\u5B8C\u6210"),
+                React.createElement("span", { className: "text-[11px] font-semibold text-slate-600 bg-white px-2.5 py-1 rounded-full" }, isOpen ? '收起' : '展开'))),
+        isOpen && (React.createElement("div", { className: "px-4 pb-4" },
+            React.createElement("div", { className: "grid grid-cols-1 xl:grid-cols-2 gap-4" }, groupedCategories.map(category => (React.createElement(CategoryAccordionGroup, { key: `done-${category}`, category: category, tasks: tasks.filter(t => normalizeCategory(t.category) === category), onEdit: onEdit, defaultExpanded: false }))))))));
+};
+const CollapsibleSwimlane = ({ catName, columns, catTasks, draggedOverCol, onDragOver, onDragLeave, onDrop, onEdit }) => {
+    const [isOpen, setIsOpen] = useState(true);
+    return (React.createElement("div", { className: "bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col mb-5 smooth-transition" },
+        React.createElement("button", { onClick: () => setIsOpen(!isOpen), className: "bg-slate-50 hover:bg-slate-100 transition-colors px-4 py-3.5 flex justify-between items-center w-full border-b border-slate-200" },
+            React.createElement("div", { className: "flex items-center space-x-3" },
+                React.createElement("svg", { className: `w-4 h-4 text-slate-400 smooth-transition ${isOpen ? 'rotate-90' : ''}`, fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" },
+                    React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M9 5l7 7-7 7" })),
+                React.createElement("h2", { className: "font-bold text-slate-700 text-sm tracking-wide flex items-center gap-2" },
+                    React.createElement("span", { className: "w-2 h-2 rounded-full bg-indigo-400" }),
+                    catName),
+                React.createElement("span", { className: "text-[11px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full" },
+                    catTasks.length,
+                    " \u9879"))),
+        React.createElement("div", { className: `swimlane-content bg-slate-50/50 ${isOpen ? 'swimlane-open' : 'swimlane-closed'}` },
+            React.createElement("div", { className: "flex overflow-x-auto custom-scrollbar p-4 space-x-4 min-h-[220px]" }, columns.map(status => {
                 const config = COLUMN_CONFIG[status];
                 const colTasks = sortTasks(catTasks.filter(t => {
-                  const key = getBoardColumnKey(t);
-                  if (status === 'Need Attention') return key === 'Need Attention' || key === 'To Do';
-                  return key === status;
+                    const key = getBoardColumnKey(t);
+                    if (status === 'Need Attention')
+                        return key === 'Need Attention' || key === 'To Do';
+                    return key === status;
                 }));
                 const dropKey = `${catName}-${status}`;
                 const isDragOver = draggedOverCol === dropKey;
                 const dropDisabled = status === 'Overdue';
-                
                 // 给进行中列动态分配更大的宽度
                 const widthClass = status === 'In progress' ? 'flex-1 min-w-[400px]' : 'w-[260px] shrink-0';
-
-                return (
-                  <div
-                    key={dropKey}
-                    onDragOver={dropDisabled ? undefined : (e) => onDragOver(e, dropKey)}
-                    onDragLeave={dropDisabled ? undefined : onDragLeave}
-                    onDrop={dropDisabled ? undefined : (e) => onDrop(e, status, catName)}
-                    className={`${widthClass} flex flex-col rounded-2xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}`}
-                  >
-                    <div className={`px-3 py-2.5 flex justify-between items-center border-b border-slate-100/50 ${config.headerBg}`}>
-                      <h3 className={`font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}`}>{config.icon}<span>{config.title}</span></h3>
-                      <span className={`text-[11px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80`}>{colTasks.length}</span>
-                    </div>
-                    <div className="p-2.5 flex-1 space-y-3 overflow-y-auto custom-scrollbar max-h-[520px]">
-                      {colTasks.length === 0 ? <div className="h-full min-h-[80px] rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs">{dropDisabled ? '根据截止日期自动进入' : '拖到这里'}</div> : colTasks.map(task => <TaskCard key={task.id} task={task} onEdit={onEdit} />)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    const TimelineView = ({ tasks, categories, onEdit }) => {
-      const [isMobileTimeline, setIsMobileTimeline] = useState(() => {
-        if (typeof window === 'undefined' || !window.matchMedia) return false;
+                return (React.createElement("div", { key: dropKey, onDragOver: dropDisabled ? undefined : (e) => onDragOver(e, dropKey), onDragLeave: dropDisabled ? undefined : onDragLeave, onDrop: dropDisabled ? undefined : (e) => onDrop(e, status, catName), className: `${widthClass} flex flex-col rounded-2xl bg-white transition-colors duration-200 border-t-4 border-x border-b ${config.borderColor} ${isDragOver ? 'drag-over border-transparent' : 'border-x-slate-200 border-b-slate-200'}` },
+                    React.createElement("div", { className: `px-3 py-2.5 flex justify-between items-center border-b border-slate-100/50 ${config.headerBg}` },
+                        React.createElement("h3", { className: `font-semibold text-[13px] flex items-center space-x-1.5 ${config.text}` },
+                            config.icon,
+                            React.createElement("span", null, config.title)),
+                        React.createElement("span", { className: `text-[11px] font-bold ${config.text} bg-white px-2 py-0.5 rounded shadow-sm opacity-80` }, colTasks.length)),
+                    React.createElement("div", { className: "p-2.5 flex-1 space-y-3 overflow-y-auto custom-scrollbar max-h-[520px]" }, colTasks.length === 0 ? React.createElement("div", { className: "h-full min-h-[80px] rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-300 text-xs" }, dropDisabled ? '根据截止日期自动进入' : '拖到这里') : colTasks.map(task => React.createElement(TaskCard, { key: task.id, task: task, onEdit: onEdit })))));
+            })))));
+};
+const TimelineView = ({ tasks, categories, onEdit }) => {
+    const [isMobileTimeline, setIsMobileTimeline] = useState(() => {
+        if (typeof window === 'undefined' || !window.matchMedia)
+            return false;
         return window.matchMedia('(max-width: 767px)').matches;
-      });
-      const [mobileCollapsedCategories, setMobileCollapsedCategories] = useState({});
-
-      useEffect(() => {
-        if (!window.matchMedia) return;
+    });
+    const [mobileCollapsedCategories, setMobileCollapsedCategories] = useState({});
+    useEffect(() => {
+        if (!window.matchMedia)
+            return;
         const mq = window.matchMedia('(max-width: 767px)');
         const update = () => setIsMobileTimeline(mq.matches);
         update();
-        if (mq.addEventListener) mq.addEventListener('change', update);
-        else mq.addListener(update);
+        if (mq.addEventListener)
+            mq.addEventListener('change', update);
+        else
+            mq.addListener(update);
         return () => {
-          if (mq.removeEventListener) mq.removeEventListener('change', update);
-          else mq.removeListener(update);
+            if (mq.removeEventListener)
+                mq.removeEventListener('change', update);
+            else
+                mq.removeListener(update);
         };
-      }, []);
-
-      const toggleMobileCategory = (catName) => {
+    }, []);
+    const toggleMobileCategory = (catName) => {
         setMobileCollapsedCategories(prev => ({ ...prev, [catName]: !prev[catName] }));
-      };
-
-      // 手机端默认按 8 个月作为一屏比例；超过 8 个月时不压缩，改为横向滑动。
-      const MOBILE_VISIBLE_MONTHS = 8;
-
-      const today = useMemo(() => {
+    };
+    // 手机端默认按 8 个月作为一屏比例；超过 8 个月时不压缩，改为横向滑动。
+    const MOBILE_VISIBLE_MONTHS = 8;
+    const today = useMemo(() => {
         const d = new Date();
         d.setHours(0, 0, 0, 0);
         return d;
-      }, []);
-
-      const enrichedTasks = useMemo(() => tasks.map(t => {
+    }, []);
+    const enrichedTasks = useMemo(() => tasks.map(t => {
         let s = parseDateOnly(t.startDate);
         let e = parseDateOnly(t.dueDate);
-        if (!s && !e) { s = new Date(today); e = new Date(today); }
-        else if (s && !e) e = new Date(today);
-        else if (!s && e) s = new Date(e);
-        if (e < s) e = new Date(s);
+        if (!s && !e) {
+            s = new Date(today);
+            e = new Date(today);
+        }
+        else if (s && !e)
+            e = new Date(today);
+        else if (!s && e)
+            s = new Date(e);
+        if (e < s)
+            e = new Date(s);
         return { ...t, _start: s, _end: e };
-      }), [tasks, today]);
-
-      const { minDate, monthsArray, totalDays, mobileViewportDays } = useMemo(() => {
+    }), [tasks, today]);
+    const { minDate, monthsArray, totalDays, mobileViewportDays } = useMemo(() => {
         let minT = Math.min(...enrichedTasks.map(t => t._start.getTime()));
         let maxT = Math.max(...enrichedTasks.map(t => t._end.getTime()));
-        if (!Number.isFinite(minT)) minT = today.getTime();
-        if (!Number.isFinite(maxT)) maxT = today.getTime();
+        if (!Number.isFinite(minT))
+            minT = today.getTime();
+        if (!Number.isFinite(maxT))
+            maxT = today.getTime();
         let minD = new Date(minT);
         let maxD = new Date(maxT);
         minD = new Date(minD.getFullYear(), minD.getMonth() - 1, 1);
         maxD = new Date(maxD.getFullYear(), maxD.getMonth() + 2, 0);
-
         if (isMobileTimeline) {
-          // 手机端：默认保持约 8 个月的可视窗口；如果存在未来任务，时间轴自动向未来延展，避免把未来项目压扁。
-          const activeOrFutureStarts = enrichedTasks
-            .filter(t => t._end.getTime() >= today.getTime() || t._start.getTime() >= today.getTime())
-            .map(t => t._start.getTime());
-
-          if (activeOrFutureStarts.length > 0) {
-            const anchorT = Math.min(today.getTime(), Math.min(...activeOrFutureStarts));
-            const anchorD = new Date(anchorT);
-            minD = new Date(anchorD.getFullYear(), anchorD.getMonth() - 1, 1);
-          }
+            // 手机端：默认保持约 8 个月的可视窗口；如果存在未来任务，时间轴自动向未来延展，避免把未来项目压扁。
+            const activeOrFutureStarts = enrichedTasks
+                .filter(t => t._end.getTime() >= today.getTime() || t._start.getTime() >= today.getTime())
+                .map(t => t._start.getTime());
+            if (activeOrFutureStarts.length > 0) {
+                const anchorT = Math.min(today.getTime(), Math.min(...activeOrFutureStarts));
+                const anchorD = new Date(anchorT);
+                minD = new Date(anchorD.getFullYear(), anchorD.getMonth() - 1, 1);
+            }
         }
-
         const mobileVisibleEnd = new Date(minD.getFullYear(), minD.getMonth() + MOBILE_VISIBLE_MONTHS, 0);
         const computedMobileViewportDays = Math.max(1, Math.round((mobileVisibleEnd.getTime() - minD.getTime()) / 86400000) + 1);
         if (isMobileTimeline && maxD < mobileVisibleEnd) {
-          maxD = mobileVisibleEnd;
+            maxD = mobileVisibleEnd;
         }
-
         const mArray = [];
         let curr = new Date(minD);
         while (curr <= maxD) {
-          const y = curr.getFullYear();
-          const m = curr.getMonth();
-          const days = new Date(y, m + 1, 0).getDate();
-          mArray.push({ year: y, month: m, daysInMonth: days });
-          curr.setMonth(m + 1);
+            const y = curr.getFullYear();
+            const m = curr.getMonth();
+            const days = new Date(y, m + 1, 0).getDate();
+            mArray.push({ year: y, month: m, daysInMonth: days });
+            curr.setMonth(m + 1);
         }
         return { minDate: minD, monthsArray: mArray, totalDays: mArray.reduce((acc, val) => acc + val.daysInMonth, 0), mobileViewportDays: computedMobileViewportDays };
-      }, [enrichedTasks, today, isMobileTimeline]);
-
-      const DAY_WIDTH = isMobileTimeline ? 6 : 4;
-      const leftColWidth = isMobileTimeline ? 142 : 320;
-      const todayOffset = (today.getTime() - minDate.getTime()) / 86400000;
-      const todayPct = Math.max(0, Math.min(100, (todayOffset / Math.max(totalDays, 1)) * 100));
-      const hasTodayInRange = todayOffset >= 0 && todayOffset <= totalDays;
-      const mobileTrackWidthPct = Math.max(100, (totalDays / Math.max(mobileViewportDays, 1)) * 100);
-      const mobileNeedsHorizontalScroll = mobileTrackWidthPct > 101;
-      const visibleCategories = categories.filter(c => c !== 'All');
-
-      const formatShortDate = (date) => {
-        if (!date) return '未定';
+    }, [enrichedTasks, today, isMobileTimeline]);
+    const DAY_WIDTH = isMobileTimeline ? 6 : 4;
+    const leftColWidth = isMobileTimeline ? 142 : 320;
+    const todayOffset = (today.getTime() - minDate.getTime()) / 86400000;
+    const todayPct = Math.max(0, Math.min(100, (todayOffset / Math.max(totalDays, 1)) * 100));
+    const hasTodayInRange = todayOffset >= 0 && todayOffset <= totalDays;
+    const mobileTrackWidthPct = Math.max(100, (totalDays / Math.max(mobileViewportDays, 1)) * 100);
+    const mobileNeedsHorizontalScroll = mobileTrackWidthPct > 101;
+    const visibleCategories = categories.filter(c => c !== 'All');
+    const formatShortDate = (date) => {
+        if (!date)
+            return '未定';
         const d = date instanceof Date ? date : parseDateOnly(date);
-        if (!d || Number.isNaN(d.getTime())) return '未定';
+        if (!d || Number.isNaN(d.getTime()))
+            return '未定';
         return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-      };
-
-      const getTaskTimelineStyle = (task) => {
+    };
+    const getTaskTimelineStyle = (task) => {
         const startDays = (task._start.getTime() - minDate.getTime()) / 86400000;
         const durationDays = Math.max(1, (task._end.getTime() - task._start.getTime()) / 86400000 + 1);
         const offsetPct = Math.max(0, Math.min(100, (startDays / Math.max(totalDays, 1)) * 100));
         const rawWidthPct = (durationDays / Math.max(totalDays, 1)) * 100;
         const widthPct = Math.max(7, Math.min(100 - offsetPct, rawWidthPct));
         return { left: `${offsetPct}%`, width: `${Math.max(widthPct, 3)}%` };
-      };
-
-      if (isMobileTimeline) {
-        return (
-          <div className="mobile-timeline-view">
-            <div className="mobile-timeline-hero">
-              <div className="mobile-timeline-hero-title">
-                <span>进度条</span>
-              </div>
-            </div>
-
-            {enrichedTasks.length === 0 ? (
-              <div className="mobile-timeline-empty">当前筛选条件下暂无事项。</div>
-            ) : visibleCategories.map(catName => {
-              const catTasks = sortTasks(enrichedTasks.filter(t => normalizeCategory(t.category) === catName));
-              if (catTasks.length === 0) return null;
-              const isCollapsed = !!mobileCollapsedCategories[catName];
-              return (
-                <section key={`mobile-timeline-${catName}`} className="mobile-timeline-category">
-                  <button type="button" className="mobile-timeline-category-head" onClick={() => toggleMobileCategory(catName)}>
-                    <div className="mobile-timeline-category-main">
-                      <span className={`mobile-timeline-category-chevron ${isCollapsed ? 'is-collapsed' : ''}`}>⌄</span>
-                      <div className="mobile-timeline-category-name">{catName}</div>
-                    </div>
-                    <div className="mobile-timeline-category-count">{catTasks.length} 项</div>
-                  </button>
-                  <div className={`mobile-timeline-category-body ${isCollapsed ? 'is-collapsed' : ''}`}>
-                    {catTasks.map(task => {
-                      const config = COLUMN_CONFIG[getBoardColumnKey(task)] || COLUMN_CONFIG['To Do'];
-                      const progressText = (task.progress && task.progress.trim()) || config.title || '查看详情';
-                      return (
-                        <article key={task.id} className="mobile-timeline-card" onClick={() => onEdit(task)}>
-                          <div className="mobile-timeline-card-top">
-                            <div className="mobile-timeline-task-title">{task.task || '未命名事项'}</div>
-                            <div className="mobile-timeline-status">{config.title}</div>
-                          </div>
-                          <div className="mobile-timeline-meta">
-                            <span>负责人：{normalizeAssigneeList(task.assignee) || '未分配'}</span>
-                            <span>{formatShortDate(task._start)} - {formatShortDate(task._end)}</span>
-                            {task.priority && <span>{task.priority.replace(' - ', ' ')}</span>}
-                          </div>
-                          <div className="mobile-timeline-track-wrap">
-                            <div className="mobile-timeline-track-inner" style={{ width: `${mobileTrackWidthPct}%` }}>
-                              <div className="mobile-timeline-months">
-                                {monthsArray.map((m, i) => (
-                                  <div key={i} className="mobile-timeline-month" style={{ width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` }}>{m.month + 1}月</div>
-                                ))}
-                              </div>
-                              <div className="mobile-timeline-track">
-                                {hasTodayInRange && <div className="mobile-timeline-today-line" style={{ left: `${todayPct}%` }}></div>}
-                                <div className={`mobile-timeline-bar ${config.barColor}`} style={getTaskTimelineStyle(task)} aria-label={`${task.task || '未命名事项'}：${config.title}`}>
-                                  <span className="mobile-timeline-progress-text">{progressText}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          {mobileNeedsHorizontalScroll && <div className="mobile-timeline-scroll-hint">左右滑动查看超过 8 个月的时间轴 →</div>}
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        );
-      }
-
-      return (
-        <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative">
-          <div className="flex-1 overflow-auto custom-scrollbar relative flex">
-            <div className="min-w-max relative pb-4">
-              <div className="flex sticky top-0 z-30 bg-white border-b border-slate-200 h-10 shadow-sm">
-                <div className="sticky left-0 z-40 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-[13px] text-slate-600 uppercase tracking-wider" style={{ width: leftColWidth }}>板块与事项标题</div>
-                <div className="flex relative" style={{ width: totalDays * DAY_WIDTH }}>
-                  {monthsArray.map((m, i) => <div key={i} className="flex flex-col items-center justify-center border-r border-slate-200 text-[11px] text-slate-500 font-bold bg-slate-50/50" style={{ width: m.daysInMonth * DAY_WIDTH }}>{m.year}年{m.month + 1}月</div>)}
-                </div>
-              </div>
-              <div className="relative" style={{ width: leftColWidth + totalDays * DAY_WIDTH, minHeight: '100%' }}>
-                <div className="absolute top-0 bottom-0 flex pointer-events-none z-0" style={{ left: leftColWidth }}>
-                  {monthsArray.map((m, i) => <div key={i} className="border-r border-slate-100 h-full box-border" style={{ width: m.daysInMonth * DAY_WIDTH }}></div>)}
-                </div>
-                {todayOffset >= 0 && todayOffset <= totalDays && <div className="absolute top-0 bottom-0 w-[2px] bg-red-400/70 z-0 pointer-events-none" style={{ left: leftColWidth + todayOffset * DAY_WIDTH }}></div>}
-                {visibleCategories.map(catName => {
-                  const catTasks = sortTasks(enrichedTasks.filter(t => normalizeCategory(t.category) === catName));
-                  if (catTasks.length === 0) return null;
-                  return (
-                    <div key={catName} className="border-b border-slate-200 relative z-10">
-                      <div className="flex bg-slate-50/90 sticky left-0 z-20 border-r border-slate-200 font-bold text-[13px] text-slate-700 items-center px-4 py-2.5 shadow-sm" style={{ width: leftColWidth }}><span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2"></span>{catName}</div>
-                      {catTasks.map(task => {
-                        const offsetDays = (task._start.getTime() - minDate.getTime()) / 86400000;
-                        const durationDays = (task._end.getTime() - task._start.getTime()) / 86400000 + 1;
+    };
+    if (isMobileTimeline) {
+        return (React.createElement("div", { className: "mobile-timeline-view" },
+            React.createElement("div", { className: "mobile-timeline-hero" },
+                React.createElement("div", { className: "mobile-timeline-hero-title" },
+                    React.createElement("span", null, "\u8FDB\u5EA6\u6761"))),
+            enrichedTasks.length === 0 ? (React.createElement("div", { className: "mobile-timeline-empty" }, "\u5F53\u524D\u7B5B\u9009\u6761\u4EF6\u4E0B\u6682\u65E0\u4E8B\u9879\u3002")) : visibleCategories.map(catName => {
+                const catTasks = sortTasks(enrichedTasks.filter(t => normalizeCategory(t.category) === catName));
+                if (catTasks.length === 0)
+                    return null;
+                const isCollapsed = !!mobileCollapsedCategories[catName];
+                return (React.createElement("section", { key: `mobile-timeline-${catName}`, className: "mobile-timeline-category" },
+                    React.createElement("button", { type: "button", className: "mobile-timeline-category-head", onClick: () => toggleMobileCategory(catName) },
+                        React.createElement("div", { className: "mobile-timeline-category-main" },
+                            React.createElement("span", { className: `mobile-timeline-category-chevron ${isCollapsed ? 'is-collapsed' : ''}` }, "\u2304"),
+                            React.createElement("div", { className: "mobile-timeline-category-name" }, catName)),
+                        React.createElement("div", { className: "mobile-timeline-category-count" },
+                            catTasks.length,
+                            " \u9879")),
+                    React.createElement("div", { className: `mobile-timeline-category-body ${isCollapsed ? 'is-collapsed' : ''}` }, catTasks.map(task => {
                         const config = COLUMN_CONFIG[getBoardColumnKey(task)] || COLUMN_CONFIG['To Do'];
-                        const barColorClass = config.barColor;
-                        return (
-                          <div key={task.id} className="relative flex group border-b border-slate-100 hover:bg-slate-50/70 transition-colors h-12">
-                            <div className="sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer" style={{ width: leftColWidth }} onClick={() => onEdit(task)}>
-                              <div className="flex-1 min-w-0 pr-2">
-                                <p className="text-[13px] font-semibold text-slate-800 truncate">{task.task}</p>
-                                <p className="text-[11px] text-slate-400 truncate mt-0.5">{normalizeAssigneeList(task.assignee)}</p>
-                              </div>
-                            </div>
-                            <div className="absolute top-0 bottom-0 right-0 pointer-events-none" style={{ left: leftColWidth }}>
-                              <div
-                                className={`absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`}
-                                style={{ left: `${offsetDays * DAY_WIDTH}px`, width: `${Math.max(durationDays * DAY_WIDTH, 12)}px` }}
-                                onClick={() => onEdit(task)}
-                              >
-                                {durationDays * DAY_WIDTH > 40 && <span className="text-[11px] font-bold text-white truncate pl-1">{task.progress || '查看详情'}</span>}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    const TableView = ({ tasks, onEdit }) => {
-      const rows = sortTasks(tasks);
-      const handleExport = () => exportTasksToExcel(tasks);
-      return (
-        <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50/90 flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-bold text-slate-800">列表清单导出</div>
-              <div className="text-xs text-slate-500 mt-1">下载当前筛选结果，导出为 Excel，方便留存当下团队进度快照。</div>
-            </div>
-            <button
-              onClick={handleExport}
-              disabled={rows.length === 0}
-              className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-colors ${rows.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'}`}
-            >
-              <Icons.Download />
-              <span>下载 Excel</span>
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto custom-scrollbar">
-            <table className="w-full min-w-[960px] text-sm">
-              <thead className="sticky top-0 bg-slate-50 z-10">
-                <tr className="text-left text-slate-500 border-b border-slate-200">
-                  <th className="px-4 py-3 font-semibold">板块分类</th>
-                  <th className="px-4 py-3 font-semibold">事项标题</th>
-                  <th className="px-4 py-3 font-semibold">进展动态</th>
-                  <th className="px-4 py-3 font-semibold">状态</th>
-                  <th className="px-4 py-3 font-semibold">优先级</th>
-                  <th className="px-4 py-3 font-semibold">参与人</th>
-                  <th className="px-4 py-3 font-semibold">开始日期</th>
-                  <th className="px-4 py-3 font-semibold">截止日期</th>
-                  <th className="px-4 py-3 font-semibold">最后修订时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr><td colSpan="9" className="px-4 py-16 text-center text-slate-400">暂无数据</td></tr>
-                ) : rows.map(task => (
-                  <tr key={task.id} className="border-b border-slate-100 hover:bg-slate-50/70 cursor-pointer" onClick={() => onEdit(task)}>
-                    <td className="px-4 py-3 text-slate-600">{task.category || '未分类'}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{task.task || '未命名事项'}</td>
-                    <td className="px-4 py-3 text-slate-600 max-w-[360px]"><div className="line-clamp-2">{task.progress || '-'}</div></td>
-                    <td className="px-4 py-3 text-slate-600">{getStatusTitle(getBoardColumnKey(task))}</td>
-                    <td className="px-4 py-3 text-slate-600">{task.priority || 'P2 - 正常'}</td>
-                    <td className="px-4 py-3 text-slate-600">{normalizeAssigneeList(task.assignee) || '未分配'}</td>
-                    <td className="px-4 py-3 text-slate-600">{task.startDate || '-'}</td>
-                    <td className="px-4 py-3 text-slate-600">{task.dueDate || '-'}</td>
-                    <td className="px-4 py-3 text-slate-600 text-[12px]">{formatDateTime(task.updatedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      );
-    };
-
-
-    function App() {
-      const [tasks, setTasks] = useState(() => DEFAULT_TASKS);
-      const [user, setUser] = useState(null);
-      const [authReady, setAuthReady] = useState(false);
-      const [loading, setLoading] = useState(false);
-      const [saving, setSaving] = useState(false);
-      const [errorMsg, setErrorMsg] = useState('');
-      const [syncMode, setSyncMode] = useState('connecting');
-      const [connectionNotice, setConnectionNotice] = useState('正在连接云端数据...');
-      const [draggedOverCol, setDraggedOverCol] = useState(null);
-      const [editingTask, setEditingTask] = useState(null);
-      const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
-      const [accessCode, setAccessCode] = useState(getStoredAccessCode);
-      const [showAccessModal, setShowAccessModal] = useState(() => !getStoredAccessCode());
-      const [accessInput, setAccessInput] = useState('');
-      const [accessInputError, setAccessInputError] = useState('');
-      const [assigneeDraft, setAssigneeDraft] = useState('');
-      const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
-
-      useEffect(() => {
+                        const progressText = (task.progress && task.progress.trim()) || config.title || '查看详情';
+                        return (React.createElement("article", { key: task.id, className: "mobile-timeline-card", onClick: () => onEdit(task) },
+                            React.createElement("div", { className: "mobile-timeline-card-top" },
+                                React.createElement("div", { className: "mobile-timeline-task-title" }, task.task || '未命名事项'),
+                                React.createElement("div", { className: "mobile-timeline-status" }, config.title)),
+                            React.createElement("div", { className: "mobile-timeline-meta" },
+                                React.createElement("span", null,
+                                    "\u8D1F\u8D23\u4EBA\uFF1A",
+                                    normalizeAssigneeList(task.assignee) || '未分配'),
+                                React.createElement("span", null,
+                                    formatShortDate(task._start),
+                                    " - ",
+                                    formatShortDate(task._end)),
+                                task.priority && React.createElement("span", null, task.priority.replace(' - ', ' '))),
+                            React.createElement("div", { className: "mobile-timeline-track-wrap" },
+                                React.createElement("div", { className: "mobile-timeline-track-inner", style: { width: `${mobileTrackWidthPct}%` } },
+                                    React.createElement("div", { className: "mobile-timeline-months" }, monthsArray.map((m, i) => (React.createElement("div", { key: i, className: "mobile-timeline-month", style: { width: `${(m.daysInMonth / Math.max(totalDays, 1)) * 100}%` } },
+                                        m.month + 1,
+                                        "\u6708")))),
+                                    React.createElement("div", { className: "mobile-timeline-track" },
+                                        hasTodayInRange && React.createElement("div", { className: "mobile-timeline-today-line", style: { left: `${todayPct}%` } }),
+                                        React.createElement("div", { className: `mobile-timeline-bar ${config.barColor}`, style: getTaskTimelineStyle(task), "aria-label": `${task.task || '未命名事项'}：${config.title}` },
+                                            React.createElement("span", { className: "mobile-timeline-progress-text" }, progressText))))),
+                            mobileNeedsHorizontalScroll && React.createElement("div", { className: "mobile-timeline-scroll-hint" }, "\u5DE6\u53F3\u6ED1\u52A8\u67E5\u770B\u8D85\u8FC7 8 \u4E2A\u6708\u7684\u65F6\u95F4\u8F74 \u2192")));
+                    }))));
+            })));
+    }
+    return (React.createElement("div", { className: "h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden relative" },
+        React.createElement("div", { className: "flex-1 overflow-auto custom-scrollbar relative flex" },
+            React.createElement("div", { className: "min-w-max relative pb-4" },
+                React.createElement("div", { className: "flex sticky top-0 z-30 bg-white border-b border-slate-200 h-10 shadow-sm" },
+                    React.createElement("div", { className: "sticky left-0 z-40 bg-white border-r border-slate-200 flex items-center px-4 font-bold text-[13px] text-slate-600 uppercase tracking-wider", style: { width: leftColWidth } }, "\u677F\u5757\u4E0E\u4E8B\u9879\u6807\u9898"),
+                    React.createElement("div", { className: "flex relative", style: { width: totalDays * DAY_WIDTH } }, monthsArray.map((m, i) => React.createElement("div", { key: i, className: "flex flex-col items-center justify-center border-r border-slate-200 text-[11px] text-slate-500 font-bold bg-slate-50/50", style: { width: m.daysInMonth * DAY_WIDTH } },
+                        m.year,
+                        "\u5E74",
+                        m.month + 1,
+                        "\u6708")))),
+                React.createElement("div", { className: "relative", style: { width: leftColWidth + totalDays * DAY_WIDTH, minHeight: '100%' } },
+                    React.createElement("div", { className: "absolute top-0 bottom-0 flex pointer-events-none z-0", style: { left: leftColWidth } }, monthsArray.map((m, i) => React.createElement("div", { key: i, className: "border-r border-slate-100 h-full box-border", style: { width: m.daysInMonth * DAY_WIDTH } }))),
+                    todayOffset >= 0 && todayOffset <= totalDays && React.createElement("div", { className: "absolute top-0 bottom-0 w-[2px] bg-red-400/70 z-0 pointer-events-none", style: { left: leftColWidth + todayOffset * DAY_WIDTH } }),
+                    visibleCategories.map(catName => {
+                        const catTasks = sortTasks(enrichedTasks.filter(t => normalizeCategory(t.category) === catName));
+                        if (catTasks.length === 0)
+                            return null;
+                        return (React.createElement("div", { key: catName, className: "border-b border-slate-200 relative z-10" },
+                            React.createElement("div", { className: "flex bg-slate-50/90 sticky left-0 z-20 border-r border-slate-200 font-bold text-[13px] text-slate-700 items-center px-4 py-2.5 shadow-sm", style: { width: leftColWidth } },
+                                React.createElement("span", { className: "w-1.5 h-1.5 rounded-full bg-indigo-400 mr-2" }),
+                                catName),
+                            catTasks.map(task => {
+                                const offsetDays = (task._start.getTime() - minDate.getTime()) / 86400000;
+                                const durationDays = (task._end.getTime() - task._start.getTime()) / 86400000 + 1;
+                                const config = COLUMN_CONFIG[getBoardColumnKey(task)] || COLUMN_CONFIG['To Do'];
+                                const barColorClass = config.barColor;
+                                return (React.createElement("div", { key: task.id, className: "relative flex group border-b border-slate-100 hover:bg-slate-50/70 transition-colors h-12" },
+                                    React.createElement("div", { className: "sticky left-0 z-20 bg-white group-hover:bg-slate-50 flex items-center px-4 border-r border-slate-200 cursor-pointer", style: { width: leftColWidth }, onClick: () => onEdit(task) },
+                                        React.createElement("div", { className: "flex-1 min-w-0 pr-2" },
+                                            React.createElement("p", { className: "text-[13px] font-semibold text-slate-800 truncate" }, task.task),
+                                            React.createElement("p", { className: "text-[11px] text-slate-400 truncate mt-0.5" }, normalizeAssigneeList(task.assignee)))),
+                                    React.createElement("div", { className: "absolute top-0 bottom-0 right-0 pointer-events-none", style: { left: leftColWidth } },
+                                        React.createElement("div", { className: `absolute top-2.5 bottom-2.5 rounded-md shadow-sm opacity-90 transition-all ${barColorClass} cursor-pointer pointer-events-auto flex items-center px-2 overflow-hidden hover:opacity-100 hover:shadow-md hover:-translate-y-0.5`, style: { left: `${offsetDays * DAY_WIDTH}px`, width: `${Math.max(durationDays * DAY_WIDTH, 12)}px` }, onClick: () => onEdit(task) }, durationDays * DAY_WIDTH > 40 && React.createElement("span", { className: "text-[11px] font-bold text-white truncate pl-1" }, task.progress || '查看详情')))));
+                            })));
+                    }))))));
+};
+const TableView = ({ tasks, onEdit }) => {
+    const rows = sortTasks(tasks);
+    const handleExport = () => exportTasksToExcel(tasks);
+    return (React.createElement("div", { className: "h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col" },
+        React.createElement("div", { className: "px-4 py-3 border-b border-slate-200 bg-slate-50/90 flex items-center justify-between gap-3" },
+            React.createElement("div", null,
+                React.createElement("div", { className: "text-sm font-bold text-slate-800" }, "\u5217\u8868\u6E05\u5355\u5BFC\u51FA"),
+                React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, "\u4E0B\u8F7D\u5F53\u524D\u7B5B\u9009\u7ED3\u679C\uFF0C\u5BFC\u51FA\u4E3A Excel\uFF0C\u65B9\u4FBF\u7559\u5B58\u5F53\u4E0B\u56E2\u961F\u8FDB\u5EA6\u5FEB\u7167\u3002")),
+            React.createElement("button", { onClick: handleExport, disabled: rows.length === 0, className: `shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-colors ${rows.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'}` },
+                React.createElement(Icons.Download, null),
+                React.createElement("span", null, "\u4E0B\u8F7D Excel"))),
+        React.createElement("div", { className: "flex-1 overflow-auto custom-scrollbar" },
+            React.createElement("table", { className: "w-full min-w-[960px] text-sm" },
+                React.createElement("thead", { className: "sticky top-0 bg-slate-50 z-10" },
+                    React.createElement("tr", { className: "text-left text-slate-500 border-b border-slate-200" },
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u677F\u5757\u5206\u7C7B"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u4E8B\u9879\u6807\u9898"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u8FDB\u5C55\u52A8\u6001"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u72B6\u6001"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u4F18\u5148\u7EA7"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u53C2\u4E0E\u4EBA"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u5F00\u59CB\u65E5\u671F"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u622A\u6B62\u65E5\u671F"),
+                        React.createElement("th", { className: "px-4 py-3 font-semibold" }, "\u6700\u540E\u4FEE\u8BA2\u65F6\u95F4"))),
+                React.createElement("tbody", null, rows.length === 0 ? (React.createElement("tr", null,
+                    React.createElement("td", { colSpan: "9", className: "px-4 py-16 text-center text-slate-400" }, "\u6682\u65E0\u6570\u636E"))) : rows.map(task => (React.createElement("tr", { key: task.id, className: "border-b border-slate-100 hover:bg-slate-50/70 cursor-pointer", onClick: () => onEdit(task) },
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600" }, task.category || '未分类'),
+                    React.createElement("td", { className: "px-4 py-3 font-medium text-slate-800" }, task.task || '未命名事项'),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600 max-w-[360px]" },
+                        React.createElement("div", { className: "line-clamp-2" }, task.progress || '-')),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600" }, getStatusTitle(getBoardColumnKey(task))),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600" }, task.priority || 'P2 - 正常'),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600" }, normalizeAssigneeList(task.assignee) || '未分配'),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600" }, task.startDate || '-'),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600" }, task.dueDate || '-'),
+                    React.createElement("td", { className: "px-4 py-3 text-slate-600 text-[12px]" }, formatDateTime(task.updatedAt))))))))));
+};
+function App() {
+    const [tasks, setTasks] = useState(() => DEFAULT_TASKS);
+    const [user, setUser] = useState(null);
+    const [authReady, setAuthReady] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
+    const [syncMode, setSyncMode] = useState('connecting');
+    const [connectionNotice, setConnectionNotice] = useState('正在连接云端数据...');
+    const [draggedOverCol, setDraggedOverCol] = useState(null);
+    const [editingTask, setEditingTask] = useState(null);
+    const [filters, setFilters] = useState({ view: 'kanban', search: '', category: 'All', assignee: 'All', status: 'All' });
+    const [accessCode, setAccessCode] = useState(getStoredAccessCode);
+    const [showAccessModal, setShowAccessModal] = useState(() => !getStoredAccessCode());
+    const [accessInput, setAccessInput] = useState('');
+    const [accessInputError, setAccessInputError] = useState('');
+    const [assigneeDraft, setAssigneeDraft] = useState('');
+    const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
+    useEffect(() => {
         if (!editingTask) {
-          setAssigneeDraft('');
-          setAssigneeDropdownOpen(false);
-          return;
+            setAssigneeDraft('');
+            setAssigneeDropdownOpen(false);
+            return;
         }
         setAssigneeDraft(normalizeAssigneeList(editingTask.assignee));
         setAssigneeDropdownOpen(false);
-      }, [editingTask]);
-
-      const accessProfile = useMemo(() => {
+    }, [editingTask]);
+    const accessProfile = useMemo(() => {
         const profile = ACCESS_PROFILES[accessCode];
         if (profile) {
-          return { code: accessCode, ...profile };
+            return { code: accessCode, ...profile };
         }
         return {
-          code: '',
-          label: '未进入工作区',
-          categories: [],
-          canEdit: false,
-          canDelete: false,
-          canExport: false,
-          defaultCategory: ''
+            code: '',
+            label: '未进入工作区',
+            categories: [],
+            canEdit: false,
+            canDelete: false,
+            canExport: false,
+            defaultCategory: ''
         };
-      }, [accessCode]);
-      const allowedCategories = Array.isArray(accessProfile.categories) ? accessProfile.categories : [];
-      const isRestrictedView = !!accessCode && Array.isArray(accessProfile.categories);
-
-      const visibleTasks = useMemo(() => {
-        if (!accessCode) return [];
-        if (!isRestrictedView) return tasks;
+    }, [accessCode]);
+    const allowedCategories = Array.isArray(accessProfile.categories) ? accessProfile.categories : [];
+    const isRestrictedView = !!accessCode && Array.isArray(accessProfile.categories);
+    const visibleTasks = useMemo(() => {
+        if (!accessCode)
+            return [];
+        if (!isRestrictedView)
+            return tasks;
         return tasks.filter(t => allowedCategories.includes(normalizeCategory(t.category)));
-      }, [tasks, accessCode, isRestrictedView, allowedCategories]);
-
-      const canAccessTask = (task) => {
-        if (!task) return false;
-        if (!isRestrictedView) return true;
+    }, [tasks, accessCode, isRestrictedView, allowedCategories]);
+    const canAccessTask = (task) => {
+        if (!task)
+            return false;
+        if (!isRestrictedView)
+            return true;
         return allowedCategories.includes(normalizeCategory(task.category));
-      };
-
-      const canEditTask = (task) => accessProfile.canEdit && canAccessTask(task);
-      const canDeleteTask = (task) => accessProfile.canDelete && canAccessTask(task);
-
-      const getDefaultCategoryForAccess = () => {
+    };
+    const canEditTask = (task) => accessProfile.canEdit && canAccessTask(task);
+    const canDeleteTask = (task) => accessProfile.canDelete && canAccessTask(task);
+    const getDefaultCategoryForAccess = () => {
         if (!isRestrictedView) {
-          const selectedCategory = filters.category !== 'All' ? normalizeCategory(filters.category) : '';
-          return CATEGORY_OPTIONS.includes(selectedCategory) ? selectedCategory : CATEGORY_OPTIONS[0];
+            const selectedCategory = filters.category !== 'All' ? normalizeCategory(filters.category) : '';
+            return CATEGORY_OPTIONS.includes(selectedCategory) ? selectedCategory : CATEGORY_OPTIONS[0];
         }
-        if (filters.category !== 'All' && allowedCategories.includes(filters.category)) return filters.category;
+        if (filters.category !== 'All' && allowedCategories.includes(filters.category))
+            return filters.category;
         return accessProfile.defaultCategory || allowedCategories[0] || '';
-      };
-
-      const getEditableCategoryDefault = (currentCategory = '') => {
+    };
+    const getEditableCategoryDefault = (currentCategory = '') => {
         const options = isRestrictedView ? allowedCategories : CATEGORY_OPTIONS;
         const normalizedCategory = currentCategory ? normalizeCategory(currentCategory) : '';
-        if (normalizedCategory && options.includes(normalizedCategory)) return normalizedCategory;
+        if (normalizedCategory && options.includes(normalizedCategory))
+            return normalizedCategory;
         const accessDefault = getDefaultCategoryForAccess();
         return options.includes(accessDefault) ? accessDefault : (options[0] || accessDefault || CATEGORY_OPTIONS[0]);
-      };
-
-      const applyAccessCode = (rawCode) => {
+    };
+    const applyAccessCode = (rawCode) => {
         const normalizedCode = normalizeAccessCode(rawCode);
         if (!ACCESS_PROFILES[normalizedCode]) {
-          setAccessInputError('访问码不正确，请重新输入。');
-          return false;
+            setAccessInputError('访问码不正确，请重新输入。');
+            return false;
         }
         setAccessCode(normalizedCode);
         setShowAccessModal(false);
@@ -1993,791 +1915,642 @@
         setFilters(prev => ({ ...prev, category: 'All', assignee: 'All', status: 'All' }));
         setEditingTask(null);
         return true;
-      };
-
-      const openAccessModal = () => {
+    };
+    const openAccessModal = () => {
         setAccessInput('');
         setAccessInputError('');
         setShowAccessModal(true);
-      };
-
-      const closeAccessModal = () => {
-        if (!accessCode) return;
+    };
+    const closeAccessModal = () => {
+        if (!accessCode)
+            return;
         setShowAccessModal(false);
         setAccessInput('');
         setAccessInputError('');
-      };
-
-      const handleAccessSubmit = (e) => {
+    };
+    const handleAccessSubmit = (e) => {
         e.preventDefault();
         applyAccessCode(accessInput);
-      };
-
-      const switchAccessCode = () => {
+    };
+    const switchAccessCode = () => {
         openAccessModal();
-      };
-
-      const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
-      const getTasksCollectionRef = () => window.FB?.db ? window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks') : null;
-      const getDocRef = (taskId) => window.FB?.db ? window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId) : null;
-
-      useEffect(() => {
+    };
+    const deployAppId = typeof __app_id !== 'undefined' ? __app_id : 'github-deploy';
+    const getTasksCollectionRef = () => { var _a; return ((_a = window.FB) === null || _a === void 0 ? void 0 : _a.db) ? window.FB.collection(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks') : null; };
+    const getDocRef = (taskId) => { var _a; return ((_a = window.FB) === null || _a === void 0 ? void 0 : _a.db) ? window.FB.doc(window.FB.db, 'artifacts', deployAppId, 'public', 'data', 'kanban_tasks', taskId) : null; };
+    useEffect(() => {
         let isMounted = true;
         let authUnsub = null;
         let fbWaitTimer = null;
-
         const openWorkspaceWithCloudIssue = (message) => {
-          if (!isMounted) return;
-          setSyncMode('error');
-          setConnectionNotice(message);
-          setErrorMsg(message);
-          setLoading(false);
+            if (!isMounted)
+                return;
+            setSyncMode('error');
+            setConnectionNotice(message);
+            setErrorMsg(message);
+            setLoading(false);
         };
-
         const initAuthAndListen = async () => {
-          if (!window.FB?.auth) {
-            const initError = window.__fbInitError;
-            openWorkspaceWithCloudIssue(initError?.message || 'Firebase 初始化失败或超时。工作台界面已打开，但云端数据暂未连接；请检查手机网络、浏览器隐私拦截或刷新重试。');
-            return;
-          }
-
-          setSyncMode('connecting');
-          setConnectionNotice('正在连接云端数据...');
-
-          if (!authUnsub) {
-            authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
-              if (!isMounted) return;
-              setUser(u || null);
-              if (u) setAuthReady(true);
-              console.log('onAuthStateChanged =>', u ? { uid: u.uid, isAnonymous: u.isAnonymous } : null);
-            });
-          }
-
-          try {
-            if (!window.FB.auth.currentUser) {
-              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await clientTimeout(window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token), FIREBASE_CLIENT_TIMEOUT_MS, 'Firebase 自定义登录超时');
-              } else {
-                await clientTimeout(window.FB.signInAnonymously(window.FB.auth), FIREBASE_CLIENT_TIMEOUT_MS, 'Firebase 匿名登录超时');
-              }
-            } else if (isMounted) {
-              setAuthReady(true);
+            var _a;
+            if (!((_a = window.FB) === null || _a === void 0 ? void 0 : _a.auth)) {
+                const initError = window.__fbInitError;
+                openWorkspaceWithCloudIssue((initError === null || initError === void 0 ? void 0 : initError.message) || 'Firebase 初始化失败或超时。工作台界面已打开，但云端数据暂未连接；请检查手机网络、浏览器隐私拦截或刷新重试。');
+                return;
             }
-
-            // 移动端部分浏览器里 onAuthStateChanged 回调可能比 signIn promise 更晚触发。
-            // 签名成功后主动推进 authReady，避免继续等待导致看板不读云端数据。
-            if (isMounted && window.FB.auth.currentUser) {
-              setUser(window.FB.auth.currentUser);
-              setAuthReady(true);
+            setSyncMode('connecting');
+            setConnectionNotice('正在连接云端数据...');
+            if (!authUnsub) {
+                authUnsub = window.FB.onAuthStateChanged(window.FB.auth, (u) => {
+                    if (!isMounted)
+                        return;
+                    setUser(u || null);
+                    if (u)
+                        setAuthReady(true);
+                    console.log('onAuthStateChanged =>', u ? { uid: u.uid, isAnonymous: u.isAnonymous } : null);
+                });
             }
-          } catch (e) {
-            console.error('Firebase Auth failed:', e);
-            openWorkspaceWithCloudIssue((e?.message || 'Firebase 认证失败') + '。工作台界面已打开，但暂时不能读写云端数据；请刷新或检查 Firebase 认证设置。');
-          }
+            try {
+                if (!window.FB.auth.currentUser) {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await clientTimeout(window.FB.signInWithCustomToken(window.FB.auth, __initial_auth_token), FIREBASE_CLIENT_TIMEOUT_MS, 'Firebase 自定义登录超时');
+                    }
+                    else {
+                        await clientTimeout(window.FB.signInAnonymously(window.FB.auth), FIREBASE_CLIENT_TIMEOUT_MS, 'Firebase 匿名登录超时');
+                    }
+                }
+                else if (isMounted) {
+                    setAuthReady(true);
+                }
+                // 移动端部分浏览器里 onAuthStateChanged 回调可能比 signIn promise 更晚触发。
+                // 签名成功后主动推进 authReady，避免继续等待导致看板不读云端数据。
+                if (isMounted && window.FB.auth.currentUser) {
+                    setUser(window.FB.auth.currentUser);
+                    setAuthReady(true);
+                }
+            }
+            catch (e) {
+                console.error('Firebase Auth failed:', e);
+                openWorkspaceWithCloudIssue(((e === null || e === void 0 ? void 0 : e.message) || 'Firebase 认证失败') + '。工作台界面已打开，但暂时不能读写云端数据；请刷新或检查 Firebase 认证设置。');
+            }
         };
-
         const handleFbLoaded = () => {
-          if (fbWaitTimer) clearTimeout(fbWaitTimer);
-          initAuthAndListen();
+            if (fbWaitTimer)
+                clearTimeout(fbWaitTimer);
+            initAuthAndListen();
         };
-
         fbWaitTimer = setTimeout(() => {
-          if (!isMounted || window.FB?.auth) return;
-          openWorkspaceWithCloudIssue('手机端等待 Firebase SDK 加载超时。工作台界面已打开，并会继续等待云端连接；请检查移动网络、浏览器隐私拦截或刷新重试。');
+            var _a;
+            if (!isMounted || ((_a = window.FB) === null || _a === void 0 ? void 0 : _a.auth))
+                return;
+            openWorkspaceWithCloudIssue('手机端等待 Firebase SDK 加载超时。工作台界面已打开，并会继续等待云端连接；请检查移动网络、浏览器隐私拦截或刷新重试。');
         }, FIREBASE_CLIENT_TIMEOUT_MS + 2000);
-
         if (typeof window.FB !== 'undefined') {
-          handleFbLoaded();
-        } else {
-          window.addEventListener('firebase-loaded', handleFbLoaded);
+            handleFbLoaded();
         }
-
+        else {
+            window.addEventListener('firebase-loaded', handleFbLoaded);
+        }
         return () => {
-          isMounted = false;
-          if (fbWaitTimer) clearTimeout(fbWaitTimer);
-          if (authUnsub) authUnsub();
-          window.removeEventListener('firebase-loaded', handleFbLoaded);
+            isMounted = false;
+            if (fbWaitTimer)
+                clearTimeout(fbWaitTimer);
+            if (authUnsub)
+                authUnsub();
+            window.removeEventListener('firebase-loaded', handleFbLoaded);
         };
-      }, []);
-
-      useEffect(() => {
+    }, []);
+    useEffect(() => {
+        var _a, _b, _c, _d, _e, _f;
         if (!accessCode) {
-          setLoading(false);
-          setTasks([]);
-          setSyncMode('locked');
-          setConnectionNotice('');
-          return;
+            setLoading(false);
+            setTasks([]);
+            setSyncMode('locked');
+            setConnectionNotice('');
+            return;
         }
-
-        if (!authReady) return;
-
-        if (!window.FB?.db || !window.FB?.auth?.currentUser) {
-          setSyncMode('connecting');
-          setConnectionNotice('云端认证尚未完成。工作台已打开，但数据需要云端连接成功后才会显示。');
-          setLoading(false);
-          return;
+        if (!authReady)
+            return;
+        if (!((_a = window.FB) === null || _a === void 0 ? void 0 : _a.db) || !((_c = (_b = window.FB) === null || _b === void 0 ? void 0 : _b.auth) === null || _c === void 0 ? void 0 : _c.currentUser)) {
+            setSyncMode('connecting');
+            setConnectionNotice('云端认证尚未完成。工作台已打开，但数据需要云端连接成功后才会显示。');
+            setLoading(false);
+            return;
         }
-
         let unsub = null;
         let snapshotTimer = null;
         try {
-          const colRef = getTasksCollectionRef();
-          if (!colRef) throw new Error('无法创建 Firestore 数据路径。');
-
-          console.log('Firebase init mode =', window.__fbInitMode);
-          console.log('Tasks collection path =', colRef.path || colRef._path?.canonicalString?.() || colRef.toString?.());
-
-          snapshotTimer = setTimeout(() => {
-            setSyncMode('connecting');
-            setConnectionNotice('已进入工作台，正在等待云端数据返回；云端快照返回后会自动显示团队数据。');
-            setLoading(false);
-          }, FIREBASE_CLIENT_TIMEOUT_MS + 3000);
-
-          unsub = window.FB.onSnapshot(colRef, (snapshot) => {
-            if (snapshotTimer) clearTimeout(snapshotTimer);
-            const fetchedTasks = [];
-            snapshot.forEach(docSnap => {
-              const data = docSnap.data() || {};
-              fetchedTasks.push({ id: docSnap.id, ...data });
+            const colRef = getTasksCollectionRef();
+            if (!colRef)
+                throw new Error('无法创建 Firestore 数据路径。');
+            console.log('Firebase init mode =', window.__fbInitMode);
+            console.log('Tasks collection path =', colRef.path || ((_e = (_d = colRef._path) === null || _d === void 0 ? void 0 : _d.canonicalString) === null || _e === void 0 ? void 0 : _e.call(_d)) || ((_f = colRef.toString) === null || _f === void 0 ? void 0 : _f.call(colRef)));
+            snapshotTimer = setTimeout(() => {
+                setSyncMode('connecting');
+                setConnectionNotice('已进入工作台，正在等待云端数据返回；云端快照返回后会自动显示团队数据。');
+                setLoading(false);
+            }, FIREBASE_CLIENT_TIMEOUT_MS + 3000);
+            unsub = window.FB.onSnapshot(colRef, (snapshot) => {
+                if (snapshotTimer)
+                    clearTimeout(snapshotTimer);
+                const fetchedTasks = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data() || {};
+                    fetchedTasks.push({ id: docSnap.id, ...data });
+                });
+                console.log('Firebase snapshot size =', snapshot.size);
+                setTasks(fetchedTasks);
+                setSyncMode('cloud');
+                setConnectionNotice('');
+                setErrorMsg('');
+                setLoading(false);
+            }, (err) => {
+                if (snapshotTimer)
+                    clearTimeout(snapshotTimer);
+                console.error('Firebase 数据同步失败:', err);
+                setSyncMode('error');
+                setConnectionNotice(((err === null || err === void 0 ? void 0 : err.message) || '数据读取失败，请检查 Firebase 权限配置。') + ' 工作台已打开，但当前不能读取云端数据。');
+                setErrorMsg('');
+                setLoading(false);
             });
-            console.log('Firebase snapshot size =', snapshot.size);
-            setTasks(fetchedTasks);
-            setSyncMode('cloud');
-            setConnectionNotice('');
-            setErrorMsg('');
-            setLoading(false);
-          }, (err) => {
-            if (snapshotTimer) clearTimeout(snapshotTimer);
-            console.error('Firebase 数据同步失败:', err);
-            setSyncMode('error');
-            setConnectionNotice((err?.message || '数据读取失败，请检查 Firebase 权限配置。') + ' 工作台已打开，但当前不能读取云端数据。');
-            setErrorMsg('');
-            setLoading(false);
-          });
-        } catch (err) {
-          if (snapshotTimer) clearTimeout(snapshotTimer);
-          console.error('Firestore 初始化失败:', err);
-          setSyncMode('error');
-          setConnectionNotice((err?.message || 'Firestore 初始化失败，请检查浏览器兼容性或 Firebase 配置。') + ' 工作台已打开，但当前不能读取云端数据。');
-          setErrorMsg('');
-          setLoading(false);
         }
-
+        catch (err) {
+            if (snapshotTimer)
+                clearTimeout(snapshotTimer);
+            console.error('Firestore 初始化失败:', err);
+            setSyncMode('error');
+            setConnectionNotice(((err === null || err === void 0 ? void 0 : err.message) || 'Firestore 初始化失败，请检查浏览器兼容性或 Firebase 配置。') + ' 工作台已打开，但当前不能读取云端数据。');
+            setErrorMsg('');
+            setLoading(false);
+        }
         return () => {
-          if (snapshotTimer) clearTimeout(snapshotTimer);
-          if (unsub) unsub();
+            if (snapshotTimer)
+                clearTimeout(snapshotTimer);
+            if (unsub)
+                unsub();
         };
-      }, [authReady, deployAppId, accessCode]);
-
-      const categories = useMemo(() => {
+    }, [authReady, deployAppId, accessCode]);
+    const categories = useMemo(() => {
         const baseCategories = isRestrictedView
-          ? allowedCategories
-          : [...new Set(visibleTasks.map(t => normalizeCategory(t.category)).filter(Boolean).sort())];
+            ? allowedCategories
+            : [...new Set(visibleTasks.map(t => normalizeCategory(t.category)).filter(Boolean).sort())];
         return ['All', ...baseCategories];
-      }, [visibleTasks, isRestrictedView, allowedCategories]);
-
-      const assignees = useMemo(() => ['All', ...new Set(visibleTasks.flatMap(t => normalizeAssigneeList(t.assignee).split('、').filter(Boolean)))], [visibleTasks]);
-      const availableAssignees = useMemo(() => assignees.filter(a => a !== 'All'), [assignees]);
-      const selectedAssigneeNames = useMemo(() => normalizeAssigneeList(assigneeDraft).split('、').filter(Boolean), [assigneeDraft]);
-      const selectedAssigneeSet = useMemo(() => new Set(selectedAssigneeNames.map(name => name.toLowerCase())), [selectedAssigneeNames]);
-      const toggleAssigneeDraft = (name) => {
+    }, [visibleTasks, isRestrictedView, allowedCategories]);
+    const assignees = useMemo(() => ['All', ...new Set(visibleTasks.flatMap(t => normalizeAssigneeList(t.assignee).split('、').filter(Boolean)))], [visibleTasks]);
+    const availableAssignees = useMemo(() => assignees.filter(a => a !== 'All'), [assignees]);
+    const selectedAssigneeNames = useMemo(() => normalizeAssigneeList(assigneeDraft).split('、').filter(Boolean), [assigneeDraft]);
+    const selectedAssigneeSet = useMemo(() => new Set(selectedAssigneeNames.map(name => name.toLowerCase())), [selectedAssigneeNames]);
+    const toggleAssigneeDraft = (name) => {
         const normalizedName = normalizeAssigneeName(name);
-        if (!normalizedName) return;
+        if (!normalizedName)
+            return;
         const currentNames = normalizeAssigneeList(assigneeDraft).split('、').filter(Boolean);
         const exists = currentNames.some(item => item.toLowerCase() === normalizedName.toLowerCase());
         const nextNames = exists
-          ? currentNames.filter(item => item.toLowerCase() !== normalizedName.toLowerCase())
-          : [...currentNames, normalizedName];
+            ? currentNames.filter(item => item.toLowerCase() !== normalizedName.toLowerCase())
+            : [...currentNames, normalizedName];
         setAssigneeDraft(normalizeAssigneeList(nextNames.join('、')));
         setAssigneeDropdownOpen(true);
-      };
-      const statusOptions = ['All', 'Need Attention', 'In progress', 'To Do', 'Pending', 'Overdue', 'Done'];
-
-      const scopedTasks = useMemo(() => {
+    };
+    const statusOptions = ['All', 'Need Attention', 'In progress', 'To Do', 'Pending', 'Overdue', 'Done'];
+    const scopedTasks = useMemo(() => {
         return [...visibleTasks].filter(t => {
-          const normalizedAssignees = normalizeAssigneeList(t.assignee);
-          const matchSearch = `${t.task || ''} ${t.detail || ''} ${t.progress || ''} ${normalizedAssignees || ''}`.toLowerCase().includes(filters.search.toLowerCase());
-          const matchCat = filters.category === 'All' || normalizeCategory(t.category) === filters.category;
-          const matchAssignee = filters.assignee === 'All' || normalizedAssignees.split('、').includes(filters.assignee);
-          return matchSearch && matchCat && matchAssignee;
+            const normalizedAssignees = normalizeAssigneeList(t.assignee);
+            const matchSearch = `${t.task || ''} ${t.detail || ''} ${t.progress || ''} ${normalizedAssignees || ''}`.toLowerCase().includes(filters.search.toLowerCase());
+            const matchCat = filters.category === 'All' || normalizeCategory(t.category) === filters.category;
+            const matchAssignee = filters.assignee === 'All' || normalizedAssignees.split('、').includes(filters.assignee);
+            return matchSearch && matchCat && matchAssignee;
         });
-      }, [visibleTasks, filters.search, filters.category, filters.assignee]);
-
-      const filteredTasks = useMemo(() => {
+    }, [visibleTasks, filters.search, filters.category, filters.assignee]);
+    const filteredTasks = useMemo(() => {
         return scopedTasks.filter(t => filters.status === 'All' || getBoardColumnKey(t) === filters.status);
-      }, [scopedTasks, filters.status]);
-
-      const summary = useMemo(() => {
+    }, [scopedTasks, filters.status]);
+    const summary = useMemo(() => {
         const total = scopedTasks.length;
         const needAttention = scopedTasks.filter(t => getBoardColumnKey(t) === 'Need Attention').length;
         const inProgress = scopedTasks.filter(t => getBoardColumnKey(t) === 'In progress').length;
         const done = scopedTasks.filter(t => getBoardColumnKey(t) === 'Done').length;
         const overdue = scopedTasks.filter(t => getBoardColumnKey(t) === 'Overdue').length;
         return { total, needAttention, inProgress, done, overdue };
-      }, [scopedTasks]);
-
-      const completedArchiveTasks = useMemo(() => sortTasks(filteredTasks.filter(t => getBoardColumnKey(t) === 'Done')), [filteredTasks]);
-
-      const openNewTask = () => {
+    }, [scopedTasks]);
+    const completedArchiveTasks = useMemo(() => sortTasks(filteredTasks.filter(t => getBoardColumnKey(t) === 'Done')), [filteredTasks]);
+    const openNewTask = () => {
         if (!accessProfile.canEdit) {
-          alert('当前访问权限不能新增事项。');
-          return;
+            alert('当前访问权限不能新增事项。');
+            return;
         }
         setEditingTask({
-          category: getDefaultCategoryForAccess(),
-          task: '',
-          detail: '',
-          progress: '',
-          status: 'To Do',
-          priority: 'P2 - 正常',
-          isUrgent: false,
-          assignee: '',
-          startDate: '',
-          dueDate: '',
-          attachmentUrl: ''
+            category: getDefaultCategoryForAccess(),
+            task: '',
+            detail: '',
+            progress: '',
+            status: 'To Do',
+            priority: 'P2 - 正常',
+            isUrgent: false,
+            assignee: '',
+            startDate: '',
+            dueDate: '',
+            attachmentUrl: ''
         });
-      };
-
-      const handleSaveTask = async (e) => {
+    };
+    const handleSaveTask = async (e) => {
+        var _a, _b, _c, _d;
         e.preventDefault();
         if (!accessProfile.canEdit) {
-          alert('当前访问权限不能新增或编辑事项。');
-          return;
+            alert('当前访问权限不能新增或编辑事项。');
+            return;
         }
         const formData = new FormData(e.target);
-        const taskId = editingTask?.id || generateId();
-        const originalTask = editingTask?.id ? tasks.find(t => t.id === taskId) : null;
-        if (editingTask?.id && !canEditTask(originalTask)) {
-          alert('当前访问权限不能编辑这个板块的事项。');
-          return;
+        const taskId = (editingTask === null || editingTask === void 0 ? void 0 : editingTask.id) || generateId();
+        const originalTask = (editingTask === null || editingTask === void 0 ? void 0 : editingTask.id) ? tasks.find(t => t.id === taskId) : null;
+        if ((editingTask === null || editingTask === void 0 ? void 0 : editingTask.id) && !canEditTask(originalTask)) {
+            alert('当前访问权限不能编辑这个板块的事项。');
+            return;
         }
-
         const submittedCategory = normalizeCategory(formData.get('category'));
         if (isRestrictedView && submittedCategory && !allowedCategories.includes(submittedCategory)) {
-          alert(`当前访问码只能保存到：${allowedCategories.join('、')}`);
-          return;
+            alert(`当前访问码只能保存到：${allowedCategories.join('、')}`);
+            return;
         }
         const finalCategory = isRestrictedView
-          ? (submittedCategory || accessProfile.defaultCategory || allowedCategories[0] || '未分类')
-          : submittedCategory;
-
+            ? (submittedCategory || accessProfile.defaultCategory || allowedCategories[0] || '未分类')
+            : submittedCategory;
         const taskData = {
-          id: taskId,
-          category: finalCategory,
-          task: String(formData.get('task') || '').trim(),
-          detail: String(formData.get('detail') || '').trim(),
-          progress: String(formData.get('progress') || '').trim(),
-          status: String(formData.get('status') || 'To Do'),
-          priority: String(formData.get('priority') || 'P2 - 正常'),
-          isUrgent: formData.get('isUrgent') === 'on',
-          assignee: normalizeAssigneeList(formData.get('assignee')),
-          startDate: String(formData.get('startDate') || '').trim(),
-          dueDate: String(formData.get('dueDate') || '').trim(),
-          attachmentUrl: String(formData.get('attachmentUrl') || '').trim(),
-          updatedAt: Date.now(),
-          createdAt: editingTask?.createdAt || Date.now()
+            id: taskId,
+            category: finalCategory,
+            task: String(formData.get('task') || '').trim(),
+            detail: String(formData.get('detail') || '').trim(),
+            progress: String(formData.get('progress') || '').trim(),
+            status: String(formData.get('status') || 'To Do'),
+            priority: String(formData.get('priority') || 'P2 - 正常'),
+            isUrgent: formData.get('isUrgent') === 'on',
+            assignee: normalizeAssigneeList(formData.get('assignee')),
+            startDate: String(formData.get('startDate') || '').trim(),
+            dueDate: String(formData.get('dueDate') || '').trim(),
+            attachmentUrl: String(formData.get('attachmentUrl') || '').trim(),
+            updatedAt: Date.now(),
+            createdAt: (editingTask === null || editingTask === void 0 ? void 0 : editingTask.createdAt) || Date.now()
         };
-        if (!taskData.task) return;
+        if (!taskData.task)
+            return;
         setSaving(true);
         const prevTasks = tasks;
-        const nextTasks = editingTask?.id ? tasks.map(t => t.id === taskId ? taskData : t) : [taskData, ...tasks];
+        const nextTasks = (editingTask === null || editingTask === void 0 ? void 0 : editingTask.id) ? tasks.map(t => t.id === taskId ? taskData : t) : [taskData, ...tasks];
         setTasks(nextTasks);
         try {
-          const docRef = getDocRef(taskId);
-          if (window.FB?.setDoc && window.FB?.db && docRef && window.FB?.auth?.currentUser) {
-            await window.FB.setDoc(docRef, taskData);
-          } else {
-            throw new Error('云端尚未连接成功，暂时无法保存。请等待“云端同步”状态出现后再操作，或刷新页面。');
-          }
-          setEditingTask(null);
-        } catch (err) {
-          console.error(err);
-          setTasks(prevTasks);
-          alert(err?.message || '保存失败，请重试');
-        } finally {
-          setSaving(false);
+            const docRef = getDocRef(taskId);
+            if (((_a = window.FB) === null || _a === void 0 ? void 0 : _a.setDoc) && ((_b = window.FB) === null || _b === void 0 ? void 0 : _b.db) && docRef && ((_d = (_c = window.FB) === null || _c === void 0 ? void 0 : _c.auth) === null || _d === void 0 ? void 0 : _d.currentUser)) {
+                await window.FB.setDoc(docRef, taskData);
+            }
+            else {
+                throw new Error('云端尚未连接成功，暂时无法保存。请等待“云端同步”状态出现后再操作，或刷新页面。');
+            }
+            setEditingTask(null);
         }
-      };
-
-      const handleDeleteTask = async () => {
-        if (!editingTask?.id) return;
+        catch (err) {
+            console.error(err);
+            setTasks(prevTasks);
+            alert((err === null || err === void 0 ? void 0 : err.message) || '保存失败，请重试');
+        }
+        finally {
+            setSaving(false);
+        }
+    };
+    const handleDeleteTask = async () => {
+        var _a, _b, _c, _d;
+        if (!(editingTask === null || editingTask === void 0 ? void 0 : editingTask.id))
+            return;
         const originalTask = tasks.find(t => t.id === editingTask.id);
         if (!canDeleteTask(originalTask)) {
-          alert('当前访问权限不能删除这个板块的事项。');
-          return;
+            alert('当前访问权限不能删除这个板块的事项。');
+            return;
         }
         const confirmed = window.confirm('确认删除这个事项吗？删除后其他人也会同步看不到。');
-        if (!confirmed) return;
-
+        if (!confirmed)
+            return;
         const prevTasks = tasks;
         setSaving(true);
         setTasks(tasks.filter(t => t.id !== editingTask.id));
         try {
-          const docRef = getDocRef(editingTask.id);
-          if (window.FB?.deleteDoc && window.FB?.db && docRef && window.FB?.auth?.currentUser) {
-            await window.FB.deleteDoc(docRef);
-          } else {
-            throw new Error('云端尚未连接成功，暂时无法删除。请等待“云端同步”状态出现后再操作，或刷新页面。');
-          }
-          setEditingTask(null);
-        } catch (err) {
-          console.error(err);
-          setTasks(prevTasks);
-          alert(err?.message || '删除失败，请重试');
-        } finally {
-          setSaving(false);
+            const docRef = getDocRef(editingTask.id);
+            if (((_a = window.FB) === null || _a === void 0 ? void 0 : _a.deleteDoc) && ((_b = window.FB) === null || _b === void 0 ? void 0 : _b.db) && docRef && ((_d = (_c = window.FB) === null || _c === void 0 ? void 0 : _c.auth) === null || _d === void 0 ? void 0 : _d.currentUser)) {
+                await window.FB.deleteDoc(docRef);
+            }
+            else {
+                throw new Error('云端尚未连接成功，暂时无法删除。请等待“云端同步”状态出现后再操作，或刷新页面。');
+            }
+            setEditingTask(null);
         }
-      };
-
-      const handleDrop = async (e, targetStatus, newCategory = null) => {
+        catch (err) {
+            console.error(err);
+            setTasks(prevTasks);
+            alert((err === null || err === void 0 ? void 0 : err.message) || '删除失败，请重试');
+        }
+        finally {
+            setSaving(false);
+        }
+    };
+    const handleDrop = async (e, targetStatus, newCategory = null) => {
+        var _a, _b, _c, _d;
         e.preventDefault();
         setDraggedOverCol(null);
-        if (targetStatus === 'Overdue') return;
+        if (targetStatus === 'Overdue')
+            return;
         const taskId = e.dataTransfer.getData('taskId');
-        if (!taskId) return;
+        if (!taskId)
+            return;
         const targetTask = tasks.find(t => t.id === taskId);
-        if (!targetTask) return;
+        if (!targetTask)
+            return;
         if (!canEditTask(targetTask)) {
-          alert('当前访问权限不能移动这个板块的事项。');
-          return;
+            alert('当前访问权限不能移动这个板块的事项。');
+            return;
         }
         const finalNewCategory = newCategory ? normalizeCategory(newCategory) : null;
         if (isRestrictedView && finalNewCategory && !allowedCategories.includes(finalNewCategory)) {
-          alert('当前访问权限不能移动到其他板块。');
-          return;
+            alert('当前访问权限不能移动到其他板块。');
+            return;
         }
-        
         // 拖入“需过目”列：仅仅打上 isUrgent 标记，不破坏其原有的底层 status
         let newStatus = targetTask.status;
         let newIsUrgent = targetTask.isUrgent;
-        
         if (targetStatus === 'Need Attention') {
             newIsUrgent = true;
-        } else {
+        }
+        else {
             newStatus = targetStatus;
             newIsUrgent = false;
         }
-
         const updatedFields = {
-          status: newStatus,
-          isUrgent: newIsUrgent,
-          updatedAt: Date.now(),
-          ...(finalNewCategory ? { category: finalNewCategory } : {})
+            status: newStatus,
+            isUrgent: newIsUrgent,
+            updatedAt: Date.now(),
+            ...(finalNewCategory ? { category: finalNewCategory } : {})
         };
         const prevTasks = tasks;
         const nextTasks = tasks.map(t => t.id === taskId ? { ...t, ...updatedFields } : t);
         setTasks(nextTasks);
         try {
-          const docRef = getDocRef(taskId);
-          if (window.FB?.updateDoc && window.FB?.db && docRef && window.FB?.auth?.currentUser) {
-            await window.FB.updateDoc(docRef, updatedFields);
-          } else {
-            throw new Error('云端尚未连接成功，暂时无法更新。请等待“云端同步”状态出现后再操作，或刷新页面。');
-          }
-        } catch (err) {
-          console.error(err);
-          setTasks(prevTasks);
-          alert(err?.message || '拖拽更新失败，请重试');
+            const docRef = getDocRef(taskId);
+            if (((_a = window.FB) === null || _a === void 0 ? void 0 : _a.updateDoc) && ((_b = window.FB) === null || _b === void 0 ? void 0 : _b.db) && docRef && ((_d = (_c = window.FB) === null || _c === void 0 ? void 0 : _c.auth) === null || _d === void 0 ? void 0 : _d.currentUser)) {
+                await window.FB.updateDoc(docRef, updatedFields);
+            }
+            else {
+                throw new Error('云端尚未连接成功，暂时无法更新。请等待“云端同步”状态出现后再操作，或刷新页面。');
+            }
         }
-      };
-
-      const viewOptions = [
+        catch (err) {
+            console.error(err);
+            setTasks(prevTasks);
+            alert((err === null || err === void 0 ? void 0 : err.message) || '拖拽更新失败，请重试');
+        }
+    };
+    const viewOptions = [
         { id: 'kanban', label: '看板' },
         { id: 'swimlane', label: '板块概览' },
         { id: 'timeline', label: '进度条' },
         { id: 'table', label: '清单' }
-      ];
-
-      const summaryCards = [
+    ];
+    const summaryCards = [
         { label: '总任务', value: summary.total, status: 'All', accent: 'text-slate-900' },
         { label: '需过目', value: summary.needAttention, status: 'Need Attention', accent: 'text-rose-600' },
         { label: '推进中', value: summary.inProgress, status: 'In progress', accent: 'text-indigo-600' },
         { label: '已完成', value: summary.done, status: 'Done', accent: 'text-emerald-600' },
         { label: '已逾期', value: summary.overdue, status: 'Overdue', accent: 'text-red-600' }
-      ];
-
-      const syncLabel = syncMode === 'cloud' ? '云端同步' : (syncMode === 'error' ? '云端异常' : '连接云端');
-      const syncLabelClass = syncMode === 'cloud' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : (syncMode === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-slate-100 text-slate-500 border-slate-200');
-
-      const renderColumnSection = (status, compact = false, taskSource = null) => {
+    ];
+    const syncLabel = syncMode === 'cloud' ? '云端同步' : (syncMode === 'error' ? '云端异常' : '连接云端');
+    const syncLabelClass = syncMode === 'cloud' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : (syncMode === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-slate-100 text-slate-500 border-slate-200');
+    const renderColumnSection = (status, compact = false, taskSource = null) => {
         const config = COLUMN_CONFIG[status];
         const columnTasks = taskSource || filteredTasks.filter(task => getBoardColumnKey(task) === status);
         const groupCategories = [...new Set(columnTasks.map(t => t.category || '未分类'))].sort();
         const isDragOver = draggedOverCol === status;
         const dropDisabled = status === 'Overdue';
-        return (
-          <section
-            key={status}
-            onDragOver={dropDisabled ? undefined : (e) => { e.preventDefault(); setDraggedOverCol(status); }}
-            onDragLeave={dropDisabled ? undefined : () => setDraggedOverCol(null)}
-            onDrop={dropDisabled ? undefined : (e) => handleDrop(e, status)}
-            className={`kanban-column-shell rounded-3xl border ${config.borderColor} p-3.5 flex flex-col flex-1 min-h-0 ${isDragOver ? 'drag-over' : ''}`}
-          >
-            <div className={`rounded-2xl ${config.headerBg} px-4 py-3 flex items-center justify-between mb-4 shrink-0`}>
-              <div className={`flex items-center gap-2 font-bold ${config.text}`}>
-                {config.icon}
-                <span>{config.title}</span>
-              </div>
-              <span className="text-sm font-semibold text-slate-500">{columnTasks.length}</span>
-            </div>
-            {status === 'Overdue' && (
-              <div className="text-[11px] text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-3 shrink-0">
-                到期未完成的项目会自动显示在这里；确认完成后再手动调整为“已完成”。
-              </div>
-            )}
-            <div className="space-y-3 custom-scrollbar overflow-y-auto overflow-x-hidden pr-1 flex-1 min-h-0">
-              {columnTasks.length === 0 ? (
-                <div className="h-40 rounded-2xl border border-dashed border-slate-200 bg-white/70 flex flex-col items-center justify-center text-center px-4">
-                  <Icons.EmptyBox />
-                  <p className="text-sm font-medium text-slate-500">当前列暂无任务</p>
-                  <p className="text-xs text-slate-400 mt-1">{dropDisabled ? '根据截止日期自动出现。' : '可把卡片拖到这里。'}</p>
-                </div>
-              ) : groupCategories.map(cat => (
-                <CategoryAccordionGroup key={`${status}-${cat}`} category={cat} tasks={columnTasks.filter(t => normalizeCategory(t.category) === cat)} onEdit={setEditingTask} previewCount={status === 'Overdue' ? 1 : 2} />
-              ))}
-            </div>
-          </section>
-        );
-      };
-
-      if (!accessCode) {
-        return (
-          <div className="access-gate-page">
-            <div className="access-gate-card">
-              <div className="access-gate-header">
-                <h2 className="access-gate-title">请输入访问码</h2>
-                <p className="access-gate-desc">请输入访问码后进入对应工作区。</p>
-              </div>
-              <form onSubmit={handleAccessSubmit} className="access-gate-form space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2">访问码</label>
-                  <input
-                    autoFocus
-                    type="password"
-                    value={accessInput}
-                    onChange={(e) => {
-                      setAccessInput(e.target.value);
-                      if (accessInputError) setAccessInputError('');
-                    }}
-                    placeholder="请输入访问码"
-                    className="access-gate-input"
-                  />
-                  {accessInputError && <p className="mt-2 text-xs font-medium text-rose-500">{accessInputError}</p>}
-                </div>
-                <div className="access-gate-actions">
-                  <button type="submit" className="access-gate-primary">
-                    进入工作区
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      }
-
-      if (loading && !showAccessModal) {
-        return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 text-center">
-            <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-            <h2 className="text-slate-500 font-medium text-sm">正在启动工作台...</h2>
-            <p className="text-xs text-slate-400 mt-2 max-w-xs leading-5">正在连接同一个云端看板；若网络较慢，也会先打开界面，不再无限停留在加载页。</p>
-          </div>
-        );
-      }
-
-      return (
-        <>
-        <div className="app-shell flex flex-col w-full overflow-hidden bg-transparent">
-          <header className="glass-header mobile-compact-header border-b border-white/60 shrink-0 z-40 overflow-hidden">
-            <div className="mobile-header-inner w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3">
-              <div className="mobile-top-row flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="mobile-title text-xl md:text-2xl font-bold text-slate-900">团队协作工作台</h1>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${syncLabelClass}`}>{syncLabel}</span>
-                  </div>
-                  {connectionNotice && <div className="sync-banner mt-2 rounded-xl px-3 py-2 text-[11px] leading-5 max-w-3xl">{connectionNotice}</div>}
-                </div>
-                <div className="mobile-top-actions flex flex-wrap gap-3 items-center">
-                  <button onClick={switchAccessCode} className="px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[12px] font-bold text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-sm" title="点击切换访问码">
-                    {accessCode ? `当前：${accessProfile.label}` : '输入访问码'}
-                  </button>
-                  <div className="mobile-view-tabs flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner">
-                    {viewOptions.map(v => (
-                      <button key={v.id} onClick={() => setFilters(f => ({ ...f, view: v.id }))} className={`px-3.5 py-1.5 text-[12px] font-medium rounded-xl transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-                        {v.label}
-                      </button>
-                    ))}
-                  </div>
-                  {accessProfile.canEdit && <button onClick={openNewTask} className="mobile-add-button px-3.5 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold shadow-sm">+ 新增事项</button>}
-                </div>
-              </div>
-
-              <div className="mobile-summary-strip grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                {summaryCards.map(card => {
-                  const active = filters.status === card.status;
-                  return (
-                    <button
-                      key={card.label}
-                      onClick={() => setFilters(f => ({ ...f, status: active ? 'All' : card.status }))}
-                      className={`summary-card summary-card-btn rounded-2xl p-3 ${active ? 'active' : ''}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="summary-label text-xs text-slate-500">{card.label}</div>
-                        <span className="click-hint text-[10px] text-slate-400">点击筛选</span>
-                      </div>
-                      <div className={`summary-value text-2xl font-bold mt-1.5 ${card.accent}`}>{card.value}</div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mobile-filter-bar flex overflow-x-auto custom-scrollbar gap-3 items-center pb-2">
-                <div className="mobile-search-box panel-glass rounded-2xl px-3.5 py-2.5 flex items-center gap-3 flex-shrink-0 min-w-[240px]">
-                  <Icons.Search />
-                  <input value={filters.search} onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="搜索事项、负责人、进展..." className="w-full bg-transparent outline-none text-sm" />
-                </div>
-                <div className="mobile-select-box panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]">
-                  <select value={filters.category} onChange={(e) => setFilters(f => ({ ...f, category: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">
-                    <option value="All">全部板块</option>
-                    {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="mobile-select-box panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]">
-                  <select value={filters.assignee} onChange={(e) => setFilters(f => ({ ...f, assignee: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">
-                    <option value="All">全部负责人</option>
-                    {assignees.filter(a => a !== 'All').map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div className="mobile-select-box panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]">
-                  <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-transparent outline-none text-sm text-slate-700">
-                    {statusOptions.map(s => <option key={s} value={s}>{s === 'All' ? '全部状态' : getStatusTitle(s)}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <main className="mobile-main flex-1 overflow-auto custom-scrollbar px-4 md:px-6 py-6 board-main">
-            <div className="w-full max-w-[1700px] mx-auto relative z-10 h-full flex flex-col">
-              {filters.view === 'kanban' && (
-                <div className="flex flex-col h-full">
-                  <div className="mobile-kanban-layout flex flex-col xl:flex-row gap-5 items-stretch xl:h-[75vh] xl:min-h-[600px]">
-                    <div className="mobile-kanban-column w-full xl:w-[320px] xl:shrink-0 flex flex-col min-h-[420px] xl:min-h-0">
-                      {/* 桌面端保持原设计：左侧“需过目”列同时承载需过目与待处理事项，不单独新增“待处理”列。 */}
-                      {renderColumnSection(
-                        'Need Attention',
-                        false,
-                        filteredTasks.filter(task => {
-                          const key = getBoardColumnKey(task);
-                          return key === 'Need Attention' || key === 'To Do';
-                        })
-                      )}
-                    </div>
-                    <div className="mobile-kanban-column w-full xl:flex-1 xl:min-w-[400px] flex flex-col min-h-[420px] xl:min-h-0">
-                      {renderColumnSection('In progress')}
-                    </div>
-                    <div className="mobile-kanban-column w-full xl:w-[320px] xl:shrink-0 flex flex-col gap-5 min-h-[420px] xl:min-h-0">
-                      {renderColumnSection('Overdue')}
-                      {renderColumnSection('Pending')}
-                    </div>
-                  </div>
-                  <div className="mt-5">
-                     <CompletedArchivePanel tasks={completedArchiveTasks} onEdit={setEditingTask} />
-                  </div>
-                </div>
-              )}
-
-              {filters.view === 'swimlane' && (
-                <div className="pb-10">
-                  {categories.filter(c => c !== 'All').length === 0 ? (
-                    <div className="panel-glass rounded-2xl p-16 text-center text-slate-400">暂无板块数据</div>
-                  ) : categories.filter(c => c !== 'All').map(cat => {
-                    const catTasks = filteredTasks.filter(t => normalizeCategory(t.category) === cat && getBoardColumnKey(t) !== 'Done');
-                    if (catTasks.length === 0) return null;
-                    return <CollapsibleSwimlane key={cat} catName={cat} columns={SWIMLANE_STATUSES} catTasks={catTasks} draggedOverCol={draggedOverCol} onDragOver={(e, key) => { e.preventDefault(); setDraggedOverCol(key); }} onDragLeave={() => setDraggedOverCol(null)} onDrop={handleDrop} onEdit={setEditingTask} />;
-                  })}
-                  <CompletedArchivePanel tasks={completedArchiveTasks} onEdit={setEditingTask} />
-                </div>
-              )}
-
-              {filters.view === 'timeline' && <TimelineView tasks={filteredTasks} categories={categories} onEdit={setEditingTask} />}
-              {filters.view === 'table' && <TableView tasks={filteredTasks} onEdit={setEditingTask} />}
-            </div>
-          </main>
-
-          {editingTask && (
-            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 modal-overlay">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200/50 modal-content">
-                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
-                  <h2 className="text-lg font-bold text-slate-800">{editingTask.id ? '编辑事项' : '新增事项'}</h2>
-                  <button onClick={() => setEditingTask(null)} className="text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors" disabled={saving}><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                </div>
-                {editingTask.id && (
-                  <div className="task-detail-preview">
-                    <div className="task-detail-preview-card">
-                      <div className="mobile-detail-topline">
-                        <span className="mobile-detail-chip status">{getStatusTitle(getBoardColumnKey(editingTask))}</span>
-                        {editingTask.priority && <span className="mobile-detail-chip">{editingTask.priority.replace(' - ', ' ')}</span>}
-                        {editingTask.isUrgent && <span className="mobile-detail-chip urgent">需过目</span>}
-                      </div>
-                      <h3 className="mobile-detail-title">{editingTask.task || '未命名事项'}</h3>
-                      <div className="mobile-detail-meta">
-                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">板块</span><span className="mobile-detail-meta-value">{editingTask.category || '未分类'}</span></div>
-                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">负责人</span><span className="mobile-detail-meta-value">{editingTask.assignee || '未分配'}</span></div>
-                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">开始</span><span className="mobile-detail-meta-value">{editingTask.startDate || '未定'}</span></div>
-                        <div className="mobile-detail-meta-item"><span className="mobile-detail-meta-label">截止</span><span className="mobile-detail-meta-value">{editingTask.dueDate || '未定'}</span></div>
-                      </div>
-                      {editingTask.detail && <div className="mobile-detail-note"><span className="mobile-section-label">内部说明备注</span><br />{editingTask.detail}</div>}
-                      {editingTask.attachmentUrl && <a className="mobile-detail-link" href={editingTask.attachmentUrl} target="_blank" rel="noreferrer">打开相关链接</a>}
-                    </div>
-                  </div>
-                )}
-                <form id="task-form" onSubmit={handleSaveTask} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="md:col-span-2"><label className="block text-[14px] font-semibold text-slate-600 mb-2">事项标题</label><input name="task" defaultValue={editingTask.task || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} required /></div>
-                    <div>
-                      <label className="block text-[14px] font-semibold text-slate-600 mb-2">板块分类</label>
-                      {isRestrictedView ? (
-                        allowedCategories.length > 1 ? (
-                          <div className="relative">
-                            <select name="category" defaultValue={getEditableCategoryDefault(editingTask.category)} className="w-full appearance-none px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
-                              {allowedCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <input value={getEditableCategoryDefault(editingTask.category)} className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[14px] text-slate-500" disabled readOnly />
-                            <input type="hidden" name="category" defaultValue={getEditableCategoryDefault(editingTask.category)} />
-                          </>
-                        )
-                      ) : (
-                        <div className="relative">
-                          <select name="category" defaultValue={getEditableCategoryDefault(editingTask.category)} className="w-full appearance-none px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>
-                            {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                          </div>
-                        </div>
-                      )}
-                      {isRestrictedView && <p className="mt-1.5 text-[11px] text-slate-400">当前访问码只允许操作：{allowedCategories.join('、')}</p>}
-                    </div>
-                    <div>
-                      <label className="block text-[14px] font-semibold text-slate-600 mb-2">负责人</label>
-                      <div className="relative">
-                        <input
-                          name="assignee"
-                          value={assigneeDraft}
-                          onChange={(e) => setAssigneeDraft(e.target.value)}
-                          onFocus={() => setAssigneeDropdownOpen(false)}
-                          placeholder="输入或选择负责人，多人可用顿号/逗号分隔"
-                          className="w-full px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
-                          disabled={saving}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setAssigneeDropdownOpen(open => !open)}
-                          className="absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors disabled:opacity-50"
-                          disabled={saving}
-                          aria-label="选择负责人"
-                        >
-                          <svg className={`w-3.5 h-3.5 transition-transform ${assigneeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                        </button>
-                        {assigneeDropdownOpen && (
-                          <div className="absolute z-30 mt-2 w-full max-h-56 overflow-y-auto custom-scrollbar rounded-xl border border-slate-200 bg-white shadow-xl p-2">
-                            {availableAssignees.length ? (
-                              availableAssignees.map(name => {
-                                const checked = selectedAssigneeSet.has(name.toLowerCase());
-                                return (
-                                  <button
-                                    type="button"
-                                    key={name}
-                                    onClick={() => toggleAssigneeDraft(name)}
-                                    className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${checked ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}`}
-                                  >
-                                    <span className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${checked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>✓</span>
-                                    <span className="truncate">{name}</span>
-                                  </button>
-                                );
-                              })
-                            ) : (
-                              <div className="px-3 py-2 text-[12px] text-slate-400">暂无已有负责人，可直接输入新成员姓名。</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <p className="mt-1.5 text-[11px] text-slate-400">可连续勾选多个负责人；新成员直接输入姓名，保存后会自动加入负责人筛选。</p>
-                    </div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">开始日期</label><input type="date" name="startDate" defaultValue={editingTask.startDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">截止日期</label><input type="date" name="dueDate" defaultValue={editingTask.dueDate || ''} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving} /></div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">当前业务状态</label><select name="status" defaultValue={editingTask.status || 'To Do'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}>{EDITABLE_STATUS_OPTIONS.map(option => <option key={option} value={option}>{getStatusTitle(option)}</option>)}</select></div>
-                    <div><label className="block text-[14px] font-semibold text-slate-600 mb-2">优先级</label><select name="priority" defaultValue={editingTask.priority || 'P2 - 正常'} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors" disabled={saving}><option value="P0 - 紧急">P0 - 紧急</option><option value="P1 - 优先">P1 - 优先</option><option value="P2 - 正常">P2 - 正常</option></select></div>
-                  </div>
-                  <div className="mobile-field-progress"><label className="block text-[14px] font-semibold text-slate-700 mb-2">最新进展 / 可编辑</label><textarea name="progress" defaultValue={editingTask.progress || ''} rows="7" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors" placeholder="写下当前最新进展，支持换行。" disabled={saving}></textarea><div className="mobile-edit-hint">这里就是唯一的最新进展区域：可直接阅读，也可以点击修改后保存。</div></div>
-                  <div className="mobile-field-detail"><label className="block text-[14px] font-semibold text-slate-600 mb-2">内部说明备注</label><textarea name="detail" defaultValue={editingTask.detail || ''} rows="4" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors" placeholder="补充内部备注、风险点或待确认事项。" disabled={saving}></textarea></div>
-                  <div><label className="flex items-center text-[14px] font-semibold text-slate-700 mb-3"><Icons.Link /><span className="ml-1.5">相关链接 (文档/网盘/网页)</span></label><input type="text" name="attachmentUrl" defaultValue={editingTask.attachmentUrl || ''} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400" placeholder="请粘贴 http:// 或 https:// 开头的链接..." disabled={saving} /></div>
-                  <div className="mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl"><label className="flex items-center cursor-pointer select-none w-fit"><input type="checkbox" name="isUrgent" defaultChecked={editingTask.isUrgent} className="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer" disabled={saving} /><span className="ml-2 text-[14px] font-bold text-rose-700">需过目</span></label></div>
-                </form>
-                <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center">
-                  {editingTask.id && canDeleteTask(tasks.find(t => t.id === editingTask.id)) ? <button type="button" onClick={handleDeleteTask} disabled={saving} className="text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors">删除任务</button> : <div></div>}
-                  <div className="flex space-x-3">
-                    <button type="button" onClick={() => setEditingTask(null)} disabled={saving} className="px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm">取消</button>
-                    <button type="submit" form="task-form" disabled={saving} className="px-6 py-2.5 text-[14px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all shadow-sm">{saving ? '保存中...' : '确认保存'}</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {showAccessModal && (
-          <div className="access-gate-overlay">
-            <div className="access-gate-card">
-              <div className="access-gate-header">
-                <h2 className="access-gate-title">请输入访问码</h2>
-                <p className="access-gate-desc">请输入访问码后进入对应工作区。</p>
-              </div>
-              <form onSubmit={handleAccessSubmit} className="access-gate-form space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-2">访问码</label>
-                  <input
-                    autoFocus
-                    type="password"
-                    value={accessInput}
-                    onChange={(e) => {
-                      setAccessInput(e.target.value);
-                      if (accessInputError) setAccessInputError('');
-                    }}
-                    placeholder="请输入访问码"
-                    className="access-gate-input"
-                  />
-                  {accessInputError && <p className="mt-2 text-xs font-medium text-rose-500">{accessInputError}</p>}
-                </div>
-                <div className="access-gate-actions">
-                  {accessCode && (
-                    <button type="button" onClick={closeAccessModal} className="access-gate-secondary">
-                      取消
-                    </button>
-                  )}
-                  <button type="submit" className="access-gate-primary">
-                    进入工作区
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-        </>
-      );
+        return (React.createElement("section", { key: status, onDragOver: dropDisabled ? undefined : (e) => { e.preventDefault(); setDraggedOverCol(status); }, onDragLeave: dropDisabled ? undefined : () => setDraggedOverCol(null), onDrop: dropDisabled ? undefined : (e) => handleDrop(e, status), className: `kanban-column-shell rounded-3xl border ${config.borderColor} p-3.5 flex flex-col flex-1 min-h-0 ${isDragOver ? 'drag-over' : ''}` },
+            React.createElement("div", { className: `rounded-2xl ${config.headerBg} px-4 py-3 flex items-center justify-between mb-4 shrink-0` },
+                React.createElement("div", { className: `flex items-center gap-2 font-bold ${config.text}` },
+                    config.icon,
+                    React.createElement("span", null, config.title)),
+                React.createElement("span", { className: "text-sm font-semibold text-slate-500" }, columnTasks.length)),
+            status === 'Overdue' && (React.createElement("div", { className: "text-[11px] text-red-500 bg-red-50 border border-red-100 rounded-xl px-3 py-2 mb-3 shrink-0" }, "\u5230\u671F\u672A\u5B8C\u6210\u7684\u9879\u76EE\u4F1A\u81EA\u52A8\u663E\u793A\u5728\u8FD9\u91CC\uFF1B\u786E\u8BA4\u5B8C\u6210\u540E\u518D\u624B\u52A8\u8C03\u6574\u4E3A\u201C\u5DF2\u5B8C\u6210\u201D\u3002")),
+            React.createElement("div", { className: "space-y-3 custom-scrollbar overflow-y-auto overflow-x-hidden pr-1 flex-1 min-h-0" }, columnTasks.length === 0 ? (React.createElement("div", { className: "h-40 rounded-2xl border border-dashed border-slate-200 bg-white/70 flex flex-col items-center justify-center text-center px-4" },
+                React.createElement(Icons.EmptyBox, null),
+                React.createElement("p", { className: "text-sm font-medium text-slate-500" }, "\u5F53\u524D\u5217\u6682\u65E0\u4EFB\u52A1"),
+                React.createElement("p", { className: "text-xs text-slate-400 mt-1" }, dropDisabled ? '根据截止日期自动出现。' : '可把卡片拖到这里。'))) : groupCategories.map(cat => (React.createElement(CategoryAccordionGroup, { key: `${status}-${cat}`, category: cat, tasks: columnTasks.filter(t => normalizeCategory(t.category) === cat), onEdit: setEditingTask, previewCount: status === 'Overdue' ? 1 : 2 }))))));
+    };
+    if (!accessCode) {
+        return (React.createElement("div", { className: "access-gate-page" },
+            React.createElement("div", { className: "access-gate-card" },
+                React.createElement("div", { className: "access-gate-header" },
+                    React.createElement("h2", { className: "access-gate-title" }, "\u8BF7\u8F93\u5165\u8BBF\u95EE\u7801"),
+                    React.createElement("p", { className: "access-gate-desc" }, "\u8BF7\u8F93\u5165\u8BBF\u95EE\u7801\u540E\u8FDB\u5165\u5BF9\u5E94\u5DE5\u4F5C\u533A\u3002")),
+                React.createElement("form", { onSubmit: handleAccessSubmit, className: "access-gate-form space-y-4" },
+                    React.createElement("div", null,
+                        React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-2" }, "\u8BBF\u95EE\u7801"),
+                        React.createElement("input", { autoFocus: true, type: "password", value: accessInput, onChange: (e) => {
+                                setAccessInput(e.target.value);
+                                if (accessInputError)
+                                    setAccessInputError('');
+                            }, placeholder: "\u8BF7\u8F93\u5165\u8BBF\u95EE\u7801", className: "access-gate-input" }),
+                        accessInputError && React.createElement("p", { className: "mt-2 text-xs font-medium text-rose-500" }, accessInputError)),
+                    React.createElement("div", { className: "access-gate-actions" },
+                        React.createElement("button", { type: "submit", className: "access-gate-primary" }, "\u8FDB\u5165\u5DE5\u4F5C\u533A"))))));
     }
+    if (loading && !showAccessModal) {
+        return (React.createElement("div", { className: "min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 text-center" },
+            React.createElement("div", { className: "w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4" }),
+            React.createElement("h2", { className: "text-slate-500 font-medium text-sm" }, "\u6B63\u5728\u542F\u52A8\u5DE5\u4F5C\u53F0..."),
+            React.createElement("p", { className: "text-xs text-slate-400 mt-2 max-w-xs leading-5" }, "\u6B63\u5728\u8FDE\u63A5\u540C\u4E00\u4E2A\u4E91\u7AEF\u770B\u677F\uFF1B\u82E5\u7F51\u7EDC\u8F83\u6162\uFF0C\u4E5F\u4F1A\u5148\u6253\u5F00\u754C\u9762\uFF0C\u4E0D\u518D\u65E0\u9650\u505C\u7559\u5728\u52A0\u8F7D\u9875\u3002")));
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "app-shell flex flex-col w-full overflow-hidden bg-transparent" },
+            React.createElement("header", { className: "glass-header mobile-compact-header border-b border-white/60 shrink-0 z-40 overflow-hidden" },
+                React.createElement("div", { className: "mobile-header-inner w-full max-w-[1700px] mx-auto px-4 md:px-5 py-3 space-y-3" },
+                    React.createElement("div", { className: "mobile-top-row flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-4" },
+                        React.createElement("div", { className: "min-w-0" },
+                            React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                                React.createElement("h1", { className: "mobile-title text-xl md:text-2xl font-bold text-slate-900" }, "\u56E2\u961F\u534F\u4F5C\u5DE5\u4F5C\u53F0"),
+                                React.createElement("span", { className: `text-[11px] font-bold px-2 py-0.5 rounded-full border ${syncLabelClass}` }, syncLabel)),
+                            connectionNotice && React.createElement("div", { className: "sync-banner mt-2 rounded-xl px-3 py-2 text-[11px] leading-5 max-w-3xl" }, connectionNotice)),
+                        React.createElement("div", { className: "mobile-top-actions flex flex-wrap gap-3 items-center" },
+                            React.createElement("button", { onClick: switchAccessCode, className: "px-3 py-2 rounded-2xl bg-white border border-slate-200 text-[12px] font-bold text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-sm", title: "\u70B9\u51FB\u5207\u6362\u8BBF\u95EE\u7801" }, accessCode ? `当前：${accessProfile.label}` : '输入访问码'),
+                            React.createElement("div", { className: "mobile-view-tabs flex flex-wrap bg-slate-100/90 rounded-2xl p-1.5 border border-slate-200/60 shadow-inner" }, viewOptions.map(v => (React.createElement("button", { key: v.id, onClick: () => setFilters(f => ({ ...f, view: v.id })), className: `px-3.5 py-1.5 text-[12px] font-medium rounded-xl transition-all ${filters.view === v.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'}` }, v.label)))),
+                            accessProfile.canEdit && React.createElement("button", { onClick: openNewTask, className: "mobile-add-button px-3.5 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold shadow-sm" }, "+ \u65B0\u589E\u4E8B\u9879"))),
+                    React.createElement("div", { className: "mobile-summary-strip grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3" }, summaryCards.map(card => {
+                        const active = filters.status === card.status;
+                        return (React.createElement("button", { key: card.label, onClick: () => setFilters(f => ({ ...f, status: active ? 'All' : card.status })), className: `summary-card summary-card-btn rounded-2xl p-3 ${active ? 'active' : ''}` },
+                            React.createElement("div", { className: "flex items-center justify-between gap-2" },
+                                React.createElement("div", { className: "summary-label text-xs text-slate-500" }, card.label),
+                                React.createElement("span", { className: "click-hint text-[10px] text-slate-400" }, "\u70B9\u51FB\u7B5B\u9009")),
+                            React.createElement("div", { className: `summary-value text-2xl font-bold mt-1.5 ${card.accent}` }, card.value)));
+                    })),
+                    React.createElement("div", { className: "mobile-filter-bar flex overflow-x-auto custom-scrollbar gap-3 items-center pb-2" },
+                        React.createElement("div", { className: "mobile-search-box panel-glass rounded-2xl px-3.5 py-2.5 flex items-center gap-3 flex-shrink-0 min-w-[240px]" },
+                            React.createElement(Icons.Search, null),
+                            React.createElement("input", { value: filters.search, onChange: (e) => setFilters(f => ({ ...f, search: e.target.value })), placeholder: "\u641C\u7D22\u4E8B\u9879\u3001\u8D1F\u8D23\u4EBA\u3001\u8FDB\u5C55...", className: "w-full bg-transparent outline-none text-sm" })),
+                        React.createElement("div", { className: "mobile-select-box panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]" },
+                            React.createElement("select", { value: filters.category, onChange: (e) => setFilters(f => ({ ...f, category: e.target.value })), className: "w-full bg-transparent outline-none text-sm text-slate-700" },
+                                React.createElement("option", { value: "All" }, "\u5168\u90E8\u677F\u5757"),
+                                categories.filter(c => c !== 'All').map(c => React.createElement("option", { key: c, value: c }, c)))),
+                        React.createElement("div", { className: "mobile-select-box panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]" },
+                            React.createElement("select", { value: filters.assignee, onChange: (e) => setFilters(f => ({ ...f, assignee: e.target.value })), className: "w-full bg-transparent outline-none text-sm text-slate-700" },
+                                React.createElement("option", { value: "All" }, "\u5168\u90E8\u8D1F\u8D23\u4EBA"),
+                                assignees.filter(a => a !== 'All').map(a => React.createElement("option", { key: a, value: a }, a)))),
+                        React.createElement("div", { className: "mobile-select-box panel-glass rounded-2xl px-3.5 py-2.5 flex-shrink-0 w-[160px]" },
+                            React.createElement("select", { value: filters.status, onChange: (e) => setFilters(f => ({ ...f, status: e.target.value })), className: "w-full bg-transparent outline-none text-sm text-slate-700" }, statusOptions.map(s => React.createElement("option", { key: s, value: s }, s === 'All' ? '全部状态' : getStatusTitle(s)))))))),
+            React.createElement("main", { className: "mobile-main flex-1 overflow-auto custom-scrollbar px-4 md:px-6 py-6 board-main" },
+                React.createElement("div", { className: "w-full max-w-[1700px] mx-auto relative z-10 h-full flex flex-col" },
+                    filters.view === 'kanban' && (React.createElement("div", { className: "flex flex-col h-full" },
+                        React.createElement("div", { className: "mobile-kanban-layout flex flex-col xl:flex-row gap-5 items-stretch xl:h-[75vh] xl:min-h-[600px]" },
+                            React.createElement("div", { className: "mobile-kanban-column w-full xl:w-[320px] xl:shrink-0 flex flex-col min-h-[420px] xl:min-h-0" }, renderColumnSection('Need Attention', false, filteredTasks.filter(task => {
+                                const key = getBoardColumnKey(task);
+                                return key === 'Need Attention' || key === 'To Do';
+                            }))),
+                            React.createElement("div", { className: "mobile-kanban-column w-full xl:flex-1 xl:min-w-[400px] flex flex-col min-h-[420px] xl:min-h-0" }, renderColumnSection('In progress')),
+                            React.createElement("div", { className: "mobile-kanban-column w-full xl:w-[320px] xl:shrink-0 flex flex-col gap-5 min-h-[420px] xl:min-h-0" },
+                                renderColumnSection('Overdue'),
+                                renderColumnSection('Pending'))),
+                        React.createElement("div", { className: "mt-5" },
+                            React.createElement(CompletedArchivePanel, { tasks: completedArchiveTasks, onEdit: setEditingTask })))),
+                    filters.view === 'swimlane' && (React.createElement("div", { className: "pb-10" },
+                        categories.filter(c => c !== 'All').length === 0 ? (React.createElement("div", { className: "panel-glass rounded-2xl p-16 text-center text-slate-400" }, "\u6682\u65E0\u677F\u5757\u6570\u636E")) : categories.filter(c => c !== 'All').map(cat => {
+                            const catTasks = filteredTasks.filter(t => normalizeCategory(t.category) === cat && getBoardColumnKey(t) !== 'Done');
+                            if (catTasks.length === 0)
+                                return null;
+                            return React.createElement(CollapsibleSwimlane, { key: cat, catName: cat, columns: SWIMLANE_STATUSES, catTasks: catTasks, draggedOverCol: draggedOverCol, onDragOver: (e, key) => { e.preventDefault(); setDraggedOverCol(key); }, onDragLeave: () => setDraggedOverCol(null), onDrop: handleDrop, onEdit: setEditingTask });
+                        }),
+                        React.createElement(CompletedArchivePanel, { tasks: completedArchiveTasks, onEdit: setEditingTask }))),
+                    filters.view === 'timeline' && React.createElement(TimelineView, { tasks: filteredTasks, categories: categories, onEdit: setEditingTask }),
+                    filters.view === 'table' && React.createElement(TableView, { tasks: filteredTasks, onEdit: setEditingTask }))),
+            editingTask && (React.createElement("div", { className: "fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 modal-overlay" },
+                React.createElement("div", { className: "bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200/50 modal-content" },
+                    React.createElement("div", { className: "px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white" },
+                        React.createElement("h2", { className: "text-lg font-bold text-slate-800" }, editingTask.id ? '编辑事项' : '新增事项'),
+                        React.createElement("button", { onClick: () => setEditingTask(null), className: "text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors", disabled: saving },
+                            React.createElement("svg", { className: "w-5 h-5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+                                React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" })))),
+                    editingTask.id && (React.createElement("div", { className: "task-detail-preview" },
+                        React.createElement("div", { className: "task-detail-preview-card" },
+                            React.createElement("div", { className: "mobile-detail-topline" },
+                                React.createElement("span", { className: "mobile-detail-chip status" }, getStatusTitle(getBoardColumnKey(editingTask))),
+                                editingTask.priority && React.createElement("span", { className: "mobile-detail-chip" }, editingTask.priority.replace(' - ', ' ')),
+                                editingTask.isUrgent && React.createElement("span", { className: "mobile-detail-chip urgent" }, "\u9700\u8FC7\u76EE")),
+                            React.createElement("h3", { className: "mobile-detail-title" }, editingTask.task || '未命名事项'),
+                            React.createElement("div", { className: "mobile-detail-meta" },
+                                React.createElement("div", { className: "mobile-detail-meta-item" },
+                                    React.createElement("span", { className: "mobile-detail-meta-label" }, "\u677F\u5757"),
+                                    React.createElement("span", { className: "mobile-detail-meta-value" }, editingTask.category || '未分类')),
+                                React.createElement("div", { className: "mobile-detail-meta-item" },
+                                    React.createElement("span", { className: "mobile-detail-meta-label" }, "\u8D1F\u8D23\u4EBA"),
+                                    React.createElement("span", { className: "mobile-detail-meta-value" }, editingTask.assignee || '未分配')),
+                                React.createElement("div", { className: "mobile-detail-meta-item" },
+                                    React.createElement("span", { className: "mobile-detail-meta-label" }, "\u5F00\u59CB"),
+                                    React.createElement("span", { className: "mobile-detail-meta-value" }, editingTask.startDate || '未定')),
+                                React.createElement("div", { className: "mobile-detail-meta-item" },
+                                    React.createElement("span", { className: "mobile-detail-meta-label" }, "\u622A\u6B62"),
+                                    React.createElement("span", { className: "mobile-detail-meta-value" }, editingTask.dueDate || '未定'))),
+                            editingTask.detail && React.createElement("div", { className: "mobile-detail-note" },
+                                React.createElement("span", { className: "mobile-section-label" }, "\u5185\u90E8\u8BF4\u660E\u5907\u6CE8"),
+                                React.createElement("br", null),
+                                editingTask.detail),
+                            editingTask.attachmentUrl && React.createElement("a", { className: "mobile-detail-link", href: editingTask.attachmentUrl, target: "_blank", rel: "noreferrer" }, "\u6253\u5F00\u76F8\u5173\u94FE\u63A5")))),
+                    React.createElement("form", { id: "task-form", onSubmit: handleSaveTask, className: "flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6" },
+                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5" },
+                            React.createElement("div", { className: "md:col-span-2" },
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u4E8B\u9879\u6807\u9898"),
+                                React.createElement("input", { name: "task", defaultValue: editingTask.task || '', className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving, required: true })),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u677F\u5757\u5206\u7C7B"),
+                                isRestrictedView ? (allowedCategories.length > 1 ? (React.createElement("div", { className: "relative" },
+                                    React.createElement("select", { name: "category", defaultValue: getEditableCategoryDefault(editingTask.category), className: "w-full appearance-none px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving }, allowedCategories.map(c => React.createElement("option", { key: c, value: c }, c))),
+                                    React.createElement("div", { className: "pointer-events-none absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm" },
+                                        React.createElement("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+                                            React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" }))))) : (React.createElement(React.Fragment, null,
+                                    React.createElement("input", { value: getEditableCategoryDefault(editingTask.category), className: "w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-[14px] text-slate-500", disabled: true, readOnly: true }),
+                                    React.createElement("input", { type: "hidden", name: "category", defaultValue: getEditableCategoryDefault(editingTask.category) })))) : (React.createElement("div", { className: "relative" },
+                                    React.createElement("select", { name: "category", defaultValue: getEditableCategoryDefault(editingTask.category), className: "w-full appearance-none px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving }, CATEGORY_OPTIONS.map(c => React.createElement("option", { key: c, value: c }, c))),
+                                    React.createElement("div", { className: "pointer-events-none absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm" },
+                                        React.createElement("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+                                            React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" }))))),
+                                isRestrictedView && React.createElement("p", { className: "mt-1.5 text-[11px] text-slate-400" },
+                                    "\u5F53\u524D\u8BBF\u95EE\u7801\u53EA\u5141\u8BB8\u64CD\u4F5C\uFF1A",
+                                    allowedCategories.join('、'))),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u8D1F\u8D23\u4EBA"),
+                                React.createElement("div", { className: "relative" },
+                                    React.createElement("input", { name: "assignee", value: assigneeDraft, onChange: (e) => setAssigneeDraft(e.target.value), onFocus: () => setAssigneeDropdownOpen(false), placeholder: "\u8F93\u5165\u6216\u9009\u62E9\u8D1F\u8D23\u4EBA\uFF0C\u591A\u4EBA\u53EF\u7528\u987F\u53F7/\u9017\u53F7\u5206\u9694", className: "w-full px-4 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving }),
+                                    React.createElement("button", { type: "button", onClick: () => setAssigneeDropdownOpen(open => !open), className: "absolute inset-y-1.5 right-1.5 flex w-9 items-center justify-center rounded-md bg-white border border-slate-200 text-indigo-600 shadow-sm hover:bg-indigo-50 transition-colors disabled:opacity-50", disabled: saving, "aria-label": "\u9009\u62E9\u8D1F\u8D23\u4EBA" },
+                                        React.createElement("svg", { className: `w-3.5 h-3.5 transition-transform ${assigneeDropdownOpen ? 'rotate-180' : ''}`, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+                                            React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 9l-7 7-7-7" }))),
+                                    assigneeDropdownOpen && (React.createElement("div", { className: "absolute z-30 mt-2 w-full max-h-56 overflow-y-auto custom-scrollbar rounded-xl border border-slate-200 bg-white shadow-xl p-2" }, availableAssignees.length ? (availableAssignees.map(name => {
+                                        const checked = selectedAssigneeSet.has(name.toLowerCase());
+                                        return (React.createElement("button", { type: "button", key: name, onClick: () => toggleAssigneeDraft(name), className: `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${checked ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'}` },
+                                            React.createElement("span", { className: `flex h-4 w-4 items-center justify-center rounded border text-[10px] ${checked ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-slate-300 bg-white text-transparent'}` }, "\u2713"),
+                                            React.createElement("span", { className: "truncate" }, name)));
+                                    })) : (React.createElement("div", { className: "px-3 py-2 text-[12px] text-slate-400" }, "\u6682\u65E0\u5DF2\u6709\u8D1F\u8D23\u4EBA\uFF0C\u53EF\u76F4\u63A5\u8F93\u5165\u65B0\u6210\u5458\u59D3\u540D\u3002"))))),
+                                React.createElement("p", { className: "mt-1.5 text-[11px] text-slate-400" }, "\u53EF\u8FDE\u7EED\u52FE\u9009\u591A\u4E2A\u8D1F\u8D23\u4EBA\uFF1B\u65B0\u6210\u5458\u76F4\u63A5\u8F93\u5165\u59D3\u540D\uFF0C\u4FDD\u5B58\u540E\u4F1A\u81EA\u52A8\u52A0\u5165\u8D1F\u8D23\u4EBA\u7B5B\u9009\u3002")),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u5F00\u59CB\u65E5\u671F"),
+                                React.createElement("input", { type: "date", name: "startDate", defaultValue: editingTask.startDate || '', className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving })),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u622A\u6B62\u65E5\u671F"),
+                                React.createElement("input", { type: "date", name: "dueDate", defaultValue: editingTask.dueDate || '', className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving }))),
+                        React.createElement("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5" },
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u5F53\u524D\u4E1A\u52A1\u72B6\u6001"),
+                                React.createElement("select", { name: "status", defaultValue: editingTask.status || 'To Do', className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving }, EDITABLE_STATUS_OPTIONS.map(option => React.createElement("option", { key: option, value: option }, getStatusTitle(option))))),
+                            React.createElement("div", null,
+                                React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u4F18\u5148\u7EA7"),
+                                React.createElement("select", { name: "priority", defaultValue: editingTask.priority || 'P2 - 正常', className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors", disabled: saving },
+                                    React.createElement("option", { value: "P0 - \u7D27\u6025" }, "P0 - \u7D27\u6025"),
+                                    React.createElement("option", { value: "P1 - \u4F18\u5148" }, "P1 - \u4F18\u5148"),
+                                    React.createElement("option", { value: "P2 - \u6B63\u5E38" }, "P2 - \u6B63\u5E38")))),
+                        React.createElement("div", { className: "mobile-field-progress" },
+                            React.createElement("label", { className: "block text-[14px] font-semibold text-slate-700 mb-2" }, "\u6700\u65B0\u8FDB\u5C55 / \u53EF\u7F16\u8F91"),
+                            React.createElement("textarea", { name: "progress", defaultValue: editingTask.progress || '', rows: "7", className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap leading-relaxed transition-colors", placeholder: "\u5199\u4E0B\u5F53\u524D\u6700\u65B0\u8FDB\u5C55\uFF0C\u652F\u6301\u6362\u884C\u3002", disabled: saving }),
+                            React.createElement("div", { className: "mobile-edit-hint" }, "\u8FD9\u91CC\u5C31\u662F\u552F\u4E00\u7684\u6700\u65B0\u8FDB\u5C55\u533A\u57DF\uFF1A\u53EF\u76F4\u63A5\u9605\u8BFB\uFF0C\u4E5F\u53EF\u4EE5\u70B9\u51FB\u4FEE\u6539\u540E\u4FDD\u5B58\u3002")),
+                        React.createElement("div", { className: "mobile-field-detail" },
+                            React.createElement("label", { className: "block text-[14px] font-semibold text-slate-600 mb-2" }, "\u5185\u90E8\u8BF4\u660E\u5907\u6CE8"),
+                            React.createElement("textarea", { name: "detail", defaultValue: editingTask.detail || '', rows: "4", className: "w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[14px] focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 whitespace-pre-wrap transition-colors", placeholder: "\u8865\u5145\u5185\u90E8\u5907\u6CE8\u3001\u98CE\u9669\u70B9\u6216\u5F85\u786E\u8BA4\u4E8B\u9879\u3002", disabled: saving })),
+                        React.createElement("div", null,
+                            React.createElement("label", { className: "flex items-center text-[14px] font-semibold text-slate-700 mb-3" },
+                                React.createElement(Icons.Link, null),
+                                React.createElement("span", { className: "ml-1.5" }, "\u76F8\u5173\u94FE\u63A5 (\u6587\u6863/\u7F51\u76D8/\u7F51\u9875)")),
+                            React.createElement("input", { type: "text", name: "attachmentUrl", defaultValue: editingTask.attachmentUrl || '', className: "w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-indigo-600 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400", placeholder: "\u8BF7\u7C98\u8D34 http:// \u6216 https:// \u5F00\u5934\u7684\u94FE\u63A5...", disabled: saving })),
+                        React.createElement("div", { className: "mt-2 p-3 bg-rose-50/30 border border-rose-200 rounded-xl" },
+                            React.createElement("label", { className: "flex items-center cursor-pointer select-none w-fit" },
+                                React.createElement("input", { type: "checkbox", name: "isUrgent", defaultChecked: editingTask.isUrgent, className: "w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer", disabled: saving }),
+                                React.createElement("span", { className: "ml-2 text-[14px] font-bold text-rose-700" }, "\u9700\u8FC7\u76EE")))),
+                    React.createElement("div", { className: "px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex justify-between items-center" },
+                        editingTask.id && canDeleteTask(tasks.find(t => t.id === editingTask.id)) ? React.createElement("button", { type: "button", onClick: handleDeleteTask, disabled: saving, className: "text-slate-400 hover:text-red-500 text-[14px] font-medium transition-colors" }, "\u5220\u9664\u4EFB\u52A1") : React.createElement("div", null),
+                        React.createElement("div", { className: "flex space-x-3" },
+                            React.createElement("button", { type: "button", onClick: () => setEditingTask(null), disabled: saving, className: "px-5 py-2.5 text-[14px] font-medium text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-sm" }, "\u53D6\u6D88"),
+                            React.createElement("button", { type: "submit", form: "task-form", disabled: saving, className: "px-6 py-2.5 text-[14px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all shadow-sm" }, saving ? '保存中...' : '确认保存'))))))),
+        showAccessModal && (React.createElement("div", { className: "access-gate-overlay" },
+            React.createElement("div", { className: "access-gate-card" },
+                React.createElement("div", { className: "access-gate-header" },
+                    React.createElement("h2", { className: "access-gate-title" }, "\u8BF7\u8F93\u5165\u8BBF\u95EE\u7801"),
+                    React.createElement("p", { className: "access-gate-desc" }, "\u8BF7\u8F93\u5165\u8BBF\u95EE\u7801\u540E\u8FDB\u5165\u5BF9\u5E94\u5DE5\u4F5C\u533A\u3002")),
+                React.createElement("form", { onSubmit: handleAccessSubmit, className: "access-gate-form space-y-4" },
+                    React.createElement("div", null,
+                        React.createElement("label", { className: "block text-xs font-bold text-slate-500 mb-2" }, "\u8BBF\u95EE\u7801"),
+                        React.createElement("input", { autoFocus: true, type: "password", value: accessInput, onChange: (e) => {
+                                setAccessInput(e.target.value);
+                                if (accessInputError)
+                                    setAccessInputError('');
+                            }, placeholder: "\u8BF7\u8F93\u5165\u8BBF\u95EE\u7801", className: "access-gate-input" }),
+                        accessInputError && React.createElement("p", { className: "mt-2 text-xs font-medium text-rose-500" }, accessInputError)),
+                    React.createElement("div", { className: "access-gate-actions" },
+                        accessCode && (React.createElement("button", { type: "button", onClick: closeAccessModal, className: "access-gate-secondary" }, "\u53D6\u6D88")),
+                        React.createElement("button", { type: "submit", className: "access-gate-primary" }, "\u8FDB\u5165\u5DE5\u4F5C\u533A"))))))));
+}
+if (!window.React || !window.ReactDOM) {
+    if (window.__showBootError) {
+        window.__showBootError('页面核心组件没有加载成功', 'React 或 ReactDOM CDN 未加载。请刷新页面，或检查当前网络/浏览器是否拦截 cdn.jsdelivr.net、unpkg.com。');
+    }
+    throw new Error('React/ReactDOM missing');
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>
